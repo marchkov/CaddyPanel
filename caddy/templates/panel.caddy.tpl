@@ -39,10 +39,14 @@
     handle_path /files/* {
         root * /opt/caddypanel/apps/filegator/dist
         rewrite * /caddypanel.php
-        php_fastcgi unix/{panel_php_fpm_socket}
+        php_fastcgi unix/{panel_php_fpm_socket} {
+            env APP_ENV production
+        }
     }
 
-    php_fastcgi unix/{panel_php_fpm_socket}
+    php_fastcgi unix/{panel_php_fpm_socket} {
+        env APP_ENV production
+    }
     file_server
 
     log {
