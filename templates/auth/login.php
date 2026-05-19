@@ -20,8 +20,6 @@
             </div>
             <button class="button primary" type="submit" style="width: 100%;">Login</button>
         </form>
-
-        <p class="muted" style="margin-bottom: 0; margin-top: 14px;">Development login: admin / password123</p>
     </section>
 </main>
 <?php
