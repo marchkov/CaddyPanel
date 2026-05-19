@@ -245,7 +245,16 @@ initialize_panel() {
 }
 
 configure_caddy() {
-    if [[ ! -f /etc/caddy/Caddyfile ]]; then
+    if [[ -f /etc/caddy/Caddyfile ]] && grep -q "root \\* /usr/share/caddy" /etc/caddy/Caddyfile; then
+        cp /etc/caddy/Caddyfile "/etc/caddy/Caddyfile.caddypanel-backup.$(date +%Y%m%d%H%M%S)"
+        cat > /etc/caddy/Caddyfile <<EOF
+{
+    email $ADMIN_EMAIL
+}
+
+import /etc/caddy/sites/*.caddy
+EOF
+    elif [[ ! -f /etc/caddy/Caddyfile ]]; then
         cat > /etc/caddy/Caddyfile <<EOF
 {
     email $ADMIN_EMAIL
