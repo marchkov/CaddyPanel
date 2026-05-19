@@ -5,6 +5,7 @@ set -euo pipefail
 APP_DIR="/opt/caddypanel"
 ADMINER_URL="${ADMINER_URL:-https://www.adminer.org/latest-mysql-en.php}"
 FILEGATOR_API_URL="${FILEGATOR_API_URL:-https://api.github.com/repos/filegator/filegator/releases/latest}"
+FILEGATOR_ZIP_URL="${FILEGATOR_ZIP_URL:-https://github.com/filegator/filegator/archive/refs/heads/master.zip}"
 PANEL_DOMAIN=""
 ADMIN_EMAIL=""
 ADMIN_USER="admin"
@@ -141,13 +142,12 @@ install_filegator() {
     }
     trap cleanup_filegator_install RETURN
 
-    FILEGATOR_DOWNLOAD_URL="$(
-        FILEGATOR_API_URL="$FILEGATOR_API_URL" php -r '
-            $json = file_get_contents(getenv("FILEGATOR_API_URL"));
-            if ($json === false) {
-                fwrite(STDERR, "Unable to fetch FileGator release metadata.\n");
-                exit(2);
-            }
+    FILEGATOR_RELEASE_JSON="$(curl -fsSL -H 'User-Agent: CaddyPanel-Installer' -H 'Accept: application/vnd.github+json' "$FILEGATOR_API_URL" || true)"
+
+    if [[ -n "$FILEGATOR_RELEASE_JSON" ]]; then
+        FILEGATOR_DOWNLOAD_URL="$(
+            printf '%s' "$FILEGATOR_RELEASE_JSON" | php -r '
+            $json = stream_get_contents(STDIN);
             $release = json_decode($json, true);
             foreach (($release["assets"] ?? []) as $asset) {
                 $name = $asset["name"] ?? "";
@@ -161,10 +161,17 @@ install_filegator() {
                 echo $release["zipball_url"];
                 exit(0);
             }
-            fwrite(STDERR, "No FileGator ZIP download URL found.\n");
-            exit(2);
-        '
-    )"
+            exit(0);
+            '
+        )"
+    fi
+
+    if [[ -z "${FILEGATOR_DOWNLOAD_URL:-}" ]]; then
+        echo "Using FileGator fallback ZIP URL because release metadata is unavailable or incomplete."
+        FILEGATOR_DOWNLOAD_URL="$FILEGATOR_ZIP_URL"
+    fi
+
+    echo "Downloading FileGator from $FILEGATOR_DOWNLOAD_URL"
 
     curl -fsSL "$FILEGATOR_DOWNLOAD_URL" -o "$FILEGATOR_ZIP"
     unzip -q "$FILEGATOR_ZIP" -d "$FILEGATOR_WORK"
