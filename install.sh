@@ -92,6 +92,22 @@ detect_php_runtime() {
     echo "Detected PHP ${PHP_VERSION}, PHP-FPM service ${PHP_FPM_SERVICE}, socket ${PHP_FPM_SOCKET}"
 }
 
+configure_php_limits() {
+    local ini_content
+
+    ini_content='upload_max_filesize = 128M
+post_max_size = 128M
+memory_limit = 256M
+max_execution_time = 300
+max_input_time = 300'
+
+    for sapi in fpm cli; do
+        if [[ -d "/etc/php/${PHP_VERSION}/${sapi}/conf.d" ]]; then
+            printf '%s\n' "$ini_content" > "/etc/php/${PHP_VERSION}/${sapi}/conf.d/99-caddypanel.ini"
+        fi
+    done
+}
+
 create_directories() {
     mkdir -p "$APP_DIR" \
         "$APP_DIR/config" \
@@ -391,6 +407,7 @@ main() {
     read_config
     install_packages
     detect_php_runtime
+    configure_php_limits
     create_directories
     configure_log_directory
     configure_caddy_php_access
