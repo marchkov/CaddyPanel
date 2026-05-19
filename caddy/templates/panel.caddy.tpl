@@ -5,14 +5,38 @@
 
     redir /files /files/
 
+    handle /files/css/* {
+        root * /opt/caddypanel/apps/filegator/dist
+        uri strip_prefix /files
+        file_server
+    }
+
+    handle /files/fonts/* {
+        root * /opt/caddypanel/apps/filegator/dist
+        uri strip_prefix /files
+        file_server
+    }
+
+    handle /files/img/* {
+        root * /opt/caddypanel/apps/filegator/dist
+        uri strip_prefix /files
+        file_server
+    }
+
+    handle /files/js/* {
+        root * /opt/caddypanel/apps/filegator/dist
+        uri strip_prefix /files
+        file_server
+    }
+
+    handle /files/favicon.ico /files/manifest.json /files/robots.txt /files/service-worker.js {
+        root * /opt/caddypanel/apps/filegator/dist
+        uri strip_prefix /files
+        file_server
+    }
+
     handle_path /files/* {
         root * /opt/caddypanel/apps/filegator/dist
-
-        @static path /favicon.ico /manifest.json /robots.txt /service-worker.js /css/* /fonts/* /img/* /js/*
-        handle @static {
-            file_server
-        }
-
         rewrite * /caddypanel.php
         php_fastcgi unix/{panel_php_fpm_socket}
     }
