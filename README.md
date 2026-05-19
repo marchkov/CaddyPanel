@@ -345,6 +345,52 @@ curl -I https://api.github.com/repos/filegator/filegator/releases/latest
 
 Do not delete `/opt/caddypanel/config/secret.key`. Without it, encrypted database passwords stored by the panel cannot be decrypted.
 
+## Uninstall
+
+To remove CaddyPanel from a VPS:
+
+```bash
+cd ~/CaddyPanel
+sudo bash uninstall.sh
+```
+
+The default uninstall removes:
+
+```text
+/opt/caddypanel
+/etc/caddy/sites/caddypanel.caddy
+/etc/cron.d/caddypanel
+/etc/sudoers.d/caddypanel
+/var/log/caddypanel
+MariaDB user caddypanel_admin@localhost
+```
+
+The default uninstall keeps user data:
+
+```text
+/var/www/sites
+/var/backups/caddypanel
+runtime packages installed by apt
+```
+
+For a fuller cleanup:
+
+```bash
+sudo bash uninstall.sh --purge-sites --purge-backups
+```
+
+To also purge CaddyPanel runtime packages:
+
+```bash
+sudo bash uninstall.sh --purge-sites --purge-backups --purge-packages
+```
+
+For non-interactive removal:
+
+```bash
+sudo bash uninstall.sh --yes
+```
+
 ## System Status
 
 Dashboard service checks use a read-only helper:
