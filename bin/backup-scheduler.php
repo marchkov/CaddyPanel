@@ -10,6 +10,7 @@ use CaddyPanel\Backups\BackupService;
 use CaddyPanel\Core\Database;
 use CaddyPanel\Databases\DatabaseRepository;
 use CaddyPanel\Scheduler\BackupScheduler;
+use CaddyPanel\Settings\SettingRepository;
 use CaddyPanel\Sites\SiteRepository;
 use CaddyPanel\System\CommandRunner;
 
@@ -32,6 +33,8 @@ if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
 $jobRepository = new BackupJobRepository($database);
 $jobService = new BackupJobService($jobRepository, $database);
 $backupRepository = new BackupRepository($database);
+$settings = new SettingRepository($database);
+$automaticBackupsToKeep = max(1, min(365, (int) $settings->get('backup_retention_count', '7')));
 $backupService = new BackupService(
     $backupRepository,
     new SiteRepository($database),
@@ -44,7 +47,7 @@ $backupService = new BackupService(
     $database
 );
 
-$scheduler = new BackupScheduler($jobRepository, $jobService, $backupService, $backupRepository);
+$scheduler = new BackupScheduler($jobRepository, $jobService, $backupService, $backupRepository, $automaticBackupsToKeep);
 echo json_encode([
     'queued' => $backupService->processQueued(),
     'scheduled' => $scheduler->run(),

@@ -52,6 +52,7 @@ class DevBootstrap
             'default_php_version' => '8.4',
             'default_php_fpm_socket' => '/run/php/php8.4-fpm.sock',
             'backup_retention_days' => '14',
+            'backup_retention_count' => '7',
             'updates_auto_check' => '1',
             'updates_branch' => 'main',
             'updates_repository_url' => 'https://github.com/marchkov/CaddyPanel.git',

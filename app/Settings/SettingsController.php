@@ -81,7 +81,7 @@ class SettingsController
             'ui_theme' => $this->settings->get('ui_theme', 'dark'),
             'default_php_version' => $this->settings->get('default_php_version', '8.4'),
             'default_php_fpm_socket' => $this->settings->get('default_php_fpm_socket', '/run/php/php8.4-fpm.sock'),
-            'backup_retention_days' => $this->settings->get('backup_retention_days', '14'),
+            'backup_retention_count' => $this->settings->get('backup_retention_count', '7'),
             'updates_auto_check' => $this->settings->get('updates_auto_check', '1'),
             'updates_branch' => $this->settings->get('updates_branch', 'main'),
         ];
@@ -94,7 +94,7 @@ class SettingsController
         $theme = (string) $request->post('ui_theme', 'dark');
         $phpVersion = trim((string) $request->post('default_php_version', '8.4'));
         $phpSocket = trim((string) $request->post('default_php_fpm_socket', '/run/php/php8.4-fpm.sock'));
-        $retentionDays = max(1, min(3650, (int) $request->post('backup_retention_days', '14')));
+        $retentionCount = max(1, min(365, (int) $request->post('backup_retention_count', '7')));
         $updatesBranch = trim((string) $request->post('updates_branch', 'main'));
 
         if ($panelDomain !== 'localhost' && preg_match('/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/', $panelDomain) !== 1) {
@@ -126,7 +126,7 @@ class SettingsController
         $this->settings->set('ui_theme', $theme);
         $this->settings->set('default_php_version', $phpVersion);
         $this->settings->set('default_php_fpm_socket', $phpSocket);
-        $this->settings->set('backup_retention_days', (string) $retentionDays);
+        $this->settings->set('backup_retention_count', (string) $retentionCount);
         $this->settings->set('updates_auto_check', !empty($_POST['updates_auto_check']) ? '1' : '0');
         $this->settings->set('updates_branch', $updatesBranch);
     }
@@ -139,7 +139,7 @@ class SettingsController
             'ui_theme' => (string) $request->post('ui_theme', 'dark'),
             'default_php_version' => (string) $request->post('default_php_version', '8.4'),
             'default_php_fpm_socket' => (string) $request->post('default_php_fpm_socket', '/run/php/php8.4-fpm.sock'),
-            'backup_retention_days' => (string) $request->post('backup_retention_days', '14'),
+            'backup_retention_count' => (string) $request->post('backup_retention_count', '7'),
             'updates_auto_check' => !empty($_POST['updates_auto_check']) ? '1' : '0',
             'updates_branch' => (string) $request->post('updates_branch', 'main'),
         ];

@@ -62,8 +62,8 @@
 
                 <h2>Backups</h2>
                 <div class="field">
-                    <label for="backup_retention_days">Backup retention days</label>
-                    <input id="backup_retention_days" name="backup_retention_days" value="<?php echo htmlspecialchars($settings['backup_retention_days'], ENT_QUOTES, 'UTF-8'); ?>">
+                    <label for="backup_retention_count">Automatic backups to keep</label>
+                    <input id="backup_retention_count" name="backup_retention_count" value="<?php echo htmlspecialchars($settings['backup_retention_count'], ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
 
                 <h2>Updates</h2>

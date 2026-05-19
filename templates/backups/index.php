@@ -72,10 +72,6 @@
                         <input id="schedule_time" name="schedule_time" value="03:00">
                     </div>
                     <div class="field">
-                        <label for="retention_days">Retention days</label>
-                        <input id="retention_days" name="retention_days" value="14">
-                    </div>
-                    <div class="field">
                         <label><input type="checkbox" name="enabled" value="1" checked style="width: auto;"> Enabled</label>
                     </div>
                     <div class="field">

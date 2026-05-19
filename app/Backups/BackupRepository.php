@@ -103,6 +103,20 @@ class BackupRepository
         );
     }
 
+    public function automaticSuccessesBeyondLimit(int $siteId, int $keep): array
+    {
+        return $this->database->fetchAll(
+            'SELECT * FROM backup_runs
+             WHERE site_id = ?
+             AND status = ?
+             AND created_by_user_id IS NULL
+             AND completed_at IS NOT NULL
+             ORDER BY completed_at DESC, id DESC
+             LIMIT -1 OFFSET ?',
+            [$siteId, 'success', $keep]
+        );
+    }
+
     public function markPruned(int $id, string $message): void
     {
         $this->database->execute(

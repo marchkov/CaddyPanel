@@ -13,7 +13,8 @@ class BackupScheduler
         private BackupJobRepository $jobs,
         private BackupJobService $jobService,
         private BackupService $backupService,
-        private BackupRepository $backupRuns
+        private BackupRepository $backupRuns,
+        private int $automaticBackupsToKeep = 7
     ) {
     }
 
@@ -30,7 +31,7 @@ class BackupScheduler
                     'include_database' => (int) $job['include_database'] === 1,
                     'include_caddy_config' => (int) $job['include_caddy_config'] === 1,
                 ]);
-                $pruned = $this->pruneOldBackups((int) $job['site_id'], (int) $job['retention_days']);
+                $pruned = $this->pruneOldAutomaticBackups((int) $job['site_id']);
                 $nextRun = $this->jobService->nextRun($job['schedule_type'], $job['schedule_time']);
                 $this->jobs->updateRunState((int) $job['id'], date('Y-m-d H:i:s'), $nextRun);
                 $results[] = [
@@ -57,10 +58,9 @@ class BackupScheduler
         return $results;
     }
 
-    private function pruneOldBackups(int $siteId, int $retentionDays): int
+    private function pruneOldAutomaticBackups(int $siteId): int
     {
-        $cutoff = (new \DateTimeImmutable())->modify('-' . max(1, $retentionDays) . ' days')->format('Y-m-d H:i:s');
-        $oldRuns = $this->backupRuns->olderThanForSite($siteId, $cutoff);
+        $oldRuns = $this->backupRuns->automaticSuccessesBeyondLimit($siteId, max(1, $this->automaticBackupsToKeep));
         $count = 0;
 
         foreach ($oldRuns as $run) {
@@ -68,7 +68,7 @@ class BackupScheduler
                 @unlink($run['backup_file']);
             }
 
-            $this->backupRuns->markPruned((int) $run['id'], 'Pruned by scheduler retention policy.');
+            $this->backupRuns->markPruned((int) $run['id'], 'Pruned by automatic backup count retention policy.');
             $count++;
         }
 
