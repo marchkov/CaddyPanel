@@ -3,6 +3,8 @@
 set -euo pipefail
 
 APP_DIR="/opt/caddypanel"
+SOURCE_REPO_URL="${SOURCE_REPO_URL:-https://github.com/marchkov/CaddyPanel.git}"
+SOURCE_REF="${SOURCE_REF:-main}"
 ADMINER_URL="${ADMINER_URL:-https://www.adminer.org/latest-mysql-en.php}"
 FILEGATOR_API_URL="${FILEGATOR_API_URL:-https://api.github.com/repos/filegator/filegator/releases/latest}"
 FILEGATOR_ZIP_URL="${FILEGATOR_ZIP_URL:-https://github.com/filegator/static/raw/master/builds/filegator_latest.zip}"
@@ -14,6 +16,8 @@ MARIADB_SERVICE_USER="caddypanel_admin"
 PHP_VERSION=""
 PHP_FPM_SOCKET=""
 PHP_FPM_SERVICE=""
+SOURCE_DIR=""
+SOURCE_WORK_DIR=""
 
 require_root() {
     if [[ "${EUID}" -ne 0 ]]; then
@@ -68,6 +72,31 @@ install_packages() {
         php-zip \
         php-gd \
         php-intl
+}
+
+cleanup_source() {
+    if [[ -n "${SOURCE_WORK_DIR:-}" && -d "$SOURCE_WORK_DIR" ]]; then
+        rm -rf "$SOURCE_WORK_DIR"
+    fi
+}
+
+prepare_source() {
+    local current_dir
+
+    current_dir="$(pwd)"
+
+    if [[ -f "$current_dir/public/index.php" && -f "$current_dir/config/app.php" && -d "$current_dir/app" ]]; then
+        SOURCE_DIR="$current_dir"
+        echo "Using local CaddyPanel source: $SOURCE_DIR"
+        return
+    fi
+
+    SOURCE_WORK_DIR="$(mktemp -d)"
+    trap cleanup_source EXIT
+
+    echo "Downloading CaddyPanel source from $SOURCE_REPO_URL ($SOURCE_REF)"
+    git clone --depth 1 --branch "$SOURCE_REF" "$SOURCE_REPO_URL" "$SOURCE_WORK_DIR"
+    SOURCE_DIR="$SOURCE_WORK_DIR"
 }
 
 detect_php_runtime() {
@@ -141,13 +170,22 @@ configure_caddy_php_access() {
 }
 
 copy_application() {
+    if [[ -z "$SOURCE_DIR" || ! -d "$SOURCE_DIR" ]]; then
+        echo "CaddyPanel source directory was not prepared." >&2
+        exit 2
+    fi
+
     rsync -a --delete \
         --exclude ".git" \
+        --exclude "apps/adminer/***" \
+        --exclude "apps/filegator/***" \
         --exclude "var/data/*.sqlite" \
         --exclude "var/generated/caddy/*.pending" \
         --exclude "var/backups/*" \
+        --exclude "var/update-cache/***" \
         --exclude "config/secret.key" \
-        ./ "$APP_DIR/"
+        --exclude "config/mariadb-service.cnf" \
+        "$SOURCE_DIR/" "$APP_DIR/"
 
     chown -R www-data:www-data "$APP_DIR"
     chown -R root:root "$APP_DIR/bin"
@@ -407,6 +445,7 @@ main() {
     require_root
     read_config
     install_packages
+    prepare_source
     detect_php_runtime
     configure_php_limits
     create_directories

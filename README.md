@@ -11,6 +11,24 @@ CaddyPanel is a minimal self-hosted VPS control panel for a trusted single-serve
 
 The current implementation is a fresh foundation based on `CaddyPanel_Project_Brief_v0.1.md`.
 
+## Quick Install
+
+Run on a fresh Ubuntu VPS as root:
+
+```bash
+wget -O install.sh https://raw.githubusercontent.com/marchkov/CaddyPanel/main/install.sh
+sudo bash install.sh
+```
+
+The installer asks for the panel domain, TLS email, and admin credentials. It installs system packages from the distribution repositories, downloads the current CaddyPanel source from GitHub, installs Adminer and FileGator, initializes the panel database, and configures Caddy.
+
+Advanced options:
+
+```bash
+sudo env SOURCE_REF=main bash install.sh
+sudo env SOURCE_REPO_URL=https://github.com/marchkov/CaddyPanel.git bash install.sh
+```
+
 ## Local Development
 
 Requirements:
