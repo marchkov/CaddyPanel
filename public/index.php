@@ -236,6 +236,7 @@ $router->get('/logs', [$logController, 'index']);
 $router->get('/logs/sites/{id}', [$logController, 'site']);
 $router->get('/backups', [$backupController, 'index']);
 $router->post('/backups/create', [$backupController, 'create']);
+$router->get('/backups/{id}/download', [$backupController, 'download']);
 $router->post('/backups/jobs/create', [$backupController, 'createJob']);
 $router->get('/restore', [$restoreController, 'index']);
 $router->get('/restore/{id}', [$restoreController, 'show']);

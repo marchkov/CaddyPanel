@@ -16,6 +16,19 @@ use CaddyPanel\System\CommandRunner;
 $config = require dirname(__DIR__) . '/config/app.php';
 $database = new Database($config['database']['path']);
 
+$lockPath = dirname(__DIR__) . '/var/backup-worker.lock';
+$lockHandle = fopen($lockPath, 'c');
+
+if ($lockHandle === false) {
+    fwrite(STDERR, "Unable to open backup worker lock.\n");
+    exit(1);
+}
+
+if (!flock($lockHandle, LOCK_EX | LOCK_NB)) {
+    echo json_encode(['status' => 'already_running'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+    exit(0);
+}
+
 $jobRepository = new BackupJobRepository($database);
 $jobService = new BackupJobService($jobRepository, $database);
 $backupRepository = new BackupRepository($database);
@@ -32,4 +45,7 @@ $backupService = new BackupService(
 );
 
 $scheduler = new BackupScheduler($jobRepository, $jobService, $backupService, $backupRepository);
-echo json_encode($scheduler->run(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+echo json_encode([
+    'queued' => $backupService->processQueued(),
+    'scheduled' => $scheduler->run(),
+], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;

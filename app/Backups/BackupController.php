@@ -49,7 +49,7 @@ class BackupController
         }
 
         try {
-            $this->backups->createForSite((int) $request->post('site_id'), (int) $_SESSION['user']['id'], $request->ip());
+            $this->backups->queueForSite((int) $request->post('site_id'), (int) $_SESSION['user']['id'], $request->ip());
             Response::redirect('/backups');
         } catch (\Throwable $exception) {
             Response::view('backups/index', ($this->viewData)([
@@ -59,6 +59,30 @@ class BackupController
                 'error' => $exception->getMessage(),
             ]));
         }
+    }
+
+    public function download(string $id): void
+    {
+        $this->guard->requireModule('backups', ($this->viewData)());
+        $this->guard->requireManagerOrAdmin();
+
+        try {
+            $download = $this->backups->downloadable((int) $id);
+        } catch (\Throwable $exception) {
+            Response::view('backups/index', ($this->viewData)([
+                'backups' => $this->backups->all(),
+                'jobs' => $this->jobs->all(),
+                'sites' => $this->sites->all(),
+                'error' => $exception->getMessage(),
+            ]));
+        }
+
+        header('Content-Type: application/gzip');
+        header('Content-Length: ' . (string) $download['size']);
+        header('Content-Disposition: attachment; filename="' . addcslashes($download['name'], '"\\') . '"');
+        header('X-Content-Type-Options: nosniff');
+        readfile($download['file']);
+        exit;
     }
 
     public function createJob(): void

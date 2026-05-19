@@ -16,7 +16,7 @@
         <div class="topbar">
             <div>
                 <h1 style="margin: 0;">Backups</h1>
-                <div class="muted">Manual backup runs.</div>
+                <div class="muted">Queued manual runs and completed backup archives.</div>
             </div>
         </div>
 
@@ -25,7 +25,7 @@
         <?php endif; ?>
 
         <section class="card" style="max-width: 720px; margin-bottom: 16px;">
-            <h2 style="margin-top: 0;">Create manual backup</h2>
+            <h2 style="margin-top: 0;">Queue manual backup</h2>
             <?php if (empty($sites)): ?>
                 <p class="muted">No sites available.</p>
             <?php else: ?>
@@ -39,7 +39,7 @@
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <button class="button primary" type="submit">Create backup</button>
+                    <button class="button primary" type="submit">Queue backup</button>
                 </form>
             <?php endif; ?>
         </section>
@@ -142,6 +142,7 @@
                         <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border);">Status</th>
                         <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border);">File</th>
                         <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border);">Message</th>
+                        <th style="text-align: right; padding: 12px; border-bottom: 1px solid var(--border);">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -152,6 +153,14 @@
                             <td style="padding: 12px; border-bottom: 1px solid var(--border);"><?php echo htmlspecialchars($backup['status'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td style="padding: 12px; border-bottom: 1px solid var(--border);"><?php echo htmlspecialchars($backup['backup_file'] ?? '-', ENT_QUOTES, 'UTF-8'); ?></td>
                             <td style="padding: 12px; border-bottom: 1px solid var(--border);"><?php echo htmlspecialchars($backup['message'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
+                            <td style="padding: 12px; border-bottom: 1px solid var(--border); text-align: right;">
+                                <?php if ($backup['status'] === 'success'): ?>
+                                    <a class="button" href="/backups/<?php echo (int) $backup['id']; ?>/download">Download</a>
+                                    <a class="button" href="/restore/<?php echo (int) $backup['id']; ?>">Restore</a>
+                                <?php else: ?>
+                                    <span class="muted">Pending</span>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 </tbody>
