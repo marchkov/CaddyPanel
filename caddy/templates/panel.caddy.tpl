@@ -29,7 +29,8 @@
         file_server
     }
 
-    handle /files/favicon.ico /files/manifest.json /files/robots.txt /files/service-worker.js {
+    @filegator_static path /files/favicon.ico /files/manifest.json /files/robots.txt /files/service-worker.js
+    handle @filegator_static {
         root * /opt/caddypanel/apps/filegator/dist
         uri strip_prefix /files
         file_server
