@@ -46,15 +46,24 @@
             <div class="grid">
                 <div>
                     <div class="muted">Caddy</div>
-                    <div class="metric"><?php echo htmlspecialchars($systemStatus['caddy'] ?? 'unknown', ENT_QUOTES, 'UTF-8'); ?></div>
+                    <div style="font-size: 18px; font-weight: 700; margin-top: 8px;"><?php echo htmlspecialchars($systemStatus['caddy'] ?? 'unknown', ENT_QUOTES, 'UTF-8'); ?></div>
                 </div>
                 <div>
                     <div class="muted">PHP-FPM</div>
-                    <div class="metric"><?php echo htmlspecialchars($systemStatus['php_fpm'] ?? 'unknown', ENT_QUOTES, 'UTF-8'); ?></div>
+                    <div style="font-size: 18px; font-weight: 700; margin-top: 8px;"><?php echo htmlspecialchars($systemStatus['php_fpm'] ?? 'unknown', ENT_QUOTES, 'UTF-8'); ?></div>
+                    <?php if (!empty($systemStatus['php_fpm_services'])): ?>
+                        <div style="margin-top: 8px; display: grid; gap: 4px;">
+                            <?php foreach ($systemStatus['php_fpm_services'] as $service): ?>
+                                <div class="muted">
+                                    <?php echo htmlspecialchars(($service['service'] ?? 'php-fpm') . ': ' . ($service['status'] ?? 'unknown'), ENT_QUOTES, 'UTF-8'); ?>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
                 <div>
                     <div class="muted">MariaDB</div>
-                    <div class="metric"><?php echo htmlspecialchars($systemStatus['mariadb'] ?? 'unknown', ENT_QUOTES, 'UTF-8'); ?></div>
+                    <div style="font-size: 18px; font-weight: 700; margin-top: 8px;"><?php echo htmlspecialchars($systemStatus['mariadb'] ?? 'unknown', ENT_QUOTES, 'UTF-8'); ?></div>
                 </div>
             </div>
             <p class="muted">Disk: <?php echo htmlspecialchars($systemStatus['disk'] ?? 'unknown', ENT_QUOTES, 'UTF-8'); ?></p>

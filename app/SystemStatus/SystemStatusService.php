@@ -18,6 +18,7 @@ class SystemStatusService
             return [
                 'caddy' => 'local',
                 'php_fpm' => 'local',
+                'php_fpm_services' => [],
                 'mariadb' => 'local',
                 'disk' => 'local',
             ];
@@ -29,6 +30,7 @@ class SystemStatusService
             return [
                 'caddy' => 'unknown',
                 'php_fpm' => 'unknown',
+                'php_fpm_services' => [],
                 'mariadb' => 'unknown',
                 'disk' => 'unknown',
                 'error' => $result['output'],
@@ -41,10 +43,15 @@ class SystemStatusService
             return [
                 'caddy' => 'unknown',
                 'php_fpm' => 'unknown',
+                'php_fpm_services' => [],
                 'mariadb' => 'unknown',
                 'disk' => 'unknown',
                 'error' => 'Invalid system-status output.',
             ];
+        }
+
+        if (!isset($decoded['php_fpm_services']) || !is_array($decoded['php_fpm_services'])) {
+            $decoded['php_fpm_services'] = [];
         }
 
         return $decoded;

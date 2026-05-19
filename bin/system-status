@@ -14,36 +14,49 @@ service_status() {
     fi
 }
 
-php_fpm_status() {
+php_fpm_services_json() {
     local service
+    local status
+    local first=1
+
+    printf '['
 
     while IFS= read -r service; do
         service="${service%.service}"
+        status="$(service_status "$service")"
 
-        if systemctl is-active --quiet "$service"; then
-            echo "active ($service)"
-            return
+        if [[ "$first" -eq 0 ]]; then
+            printf ','
         fi
+
+        first=0
+        printf '{"service":"%s","status":"%s"}' "$service" "$status"
     done < <(systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print $1}' | sort -V)
 
-    service="$(systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print $1}' | sort -V | tail -n 1)"
+    printf ']'
+}
 
-    if [[ -n "$service" ]]; then
-        service="${service%.service}"
-        printf '%s (%s)\n' "$(service_status "$service")" "$service"
-        return
+php_fpm_summary() {
+    local services_json="$1"
+
+    if [[ "$services_json" == *'"status":"active"'* ]]; then
+        echo "active"
+    elif [[ "$services_json" == "[]" ]]; then
+        echo "unknown"
+    else
+        echo "inactive"
     fi
-
-    echo "unknown"
 }
 
 CADDY_STATUS="$(service_status caddy)"
-PHP_STATUS="$(php_fpm_status)"
+PHP_FPM_SERVICES="$(php_fpm_services_json)"
+PHP_STATUS="$(php_fpm_summary "$PHP_FPM_SERVICES")"
 MARIADB_STATUS="$(service_status mariadb)"
 DISK_USAGE="$(df -h / | awk 'NR==2 {print $3 "/" $2 " (" $5 ")"}')"
 
-printf '{"caddy":"%s","php_fpm":"%s","mariadb":"%s","disk":"%s"}\n' \
+printf '{"caddy":"%s","php_fpm":"%s","php_fpm_services":%s,"mariadb":"%s","disk":"%s"}\n' \
     "$CADDY_STATUS" \
     "$PHP_STATUS" \
+    "$PHP_FPM_SERVICES" \
     "$MARIADB_STATUS" \
     "$DISK_USAGE"
