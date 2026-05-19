@@ -263,6 +263,86 @@ Target platform:
 Debian 12/13 or Ubuntu 24.04 with PHP 8.4 packages available
 ```
 
+## Production Installation
+
+Use a fresh VPS. The installer assumes it can manage Caddy, PHP-FPM, MariaDB, sudoers, cron, and `/opt/caddypanel`.
+
+Before installing:
+
+- point a DNS `A` record for the panel domain to the VPS public IP;
+- make sure ports `80` and `443` are open;
+- log in as a sudo-capable user;
+- decide the panel domain, admin email, admin username, and admin password.
+
+Clone and install:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git
+git clone https://github.com/marchkov/CaddyPanel.git
+cd CaddyPanel
+sudo bash install.sh
+```
+
+The installer prompts for:
+
+```text
+Panel domain
+Admin email for Caddy TLS
+Admin username
+Admin password
+```
+
+After install, open:
+
+```text
+https://your-panel-domain.example
+```
+
+Important files and directories:
+
+```text
+/opt/caddypanel                         app installation
+/opt/caddypanel/config/secret.key       encryption key, back this up
+/opt/caddypanel/config/mariadb-service.cnf
+/etc/caddy/Caddyfile
+/etc/caddy/sites/caddypanel.caddy
+/etc/sudoers.d/caddypanel
+/etc/cron.d/caddypanel
+/var/www/sites
+/var/backups/caddypanel
+/var/log/caddypanel
+```
+
+Post-install checks:
+
+```bash
+systemctl status caddy --no-pager
+systemctl status php8.4-fpm --no-pager
+systemctl status mariadb --no-pager
+caddy validate --config /etc/caddy/Caddyfile
+sudo -u www-data php /opt/caddypanel/bin/backup-scheduler.php
+sudo -u www-data php /opt/caddypanel/bin/update-cron.php
+```
+
+If `apt` cannot find `php8.4-*` packages, stop and add the appropriate PHP package repository for your OS, or adjust `install.sh` to the installed PHP version before rerunning.
+
+If Caddy validation fails, inspect:
+
+```bash
+journalctl -u caddy -n 100 --no-pager
+caddy validate --config /etc/caddy/Caddyfile
+```
+
+If FileGator install fails, verify outbound HTTPS access and Composer:
+
+```bash
+composer --version
+curl -I https://api.github.com/repos/filegator/filegator/releases/latest
+```
+
+Do not delete `/opt/caddypanel/config/secret.key`. Without it, encrypted database passwords stored by the panel cannot be decrypted.
+
 ## System Status
 
 Dashboard service checks use a read-only helper:
