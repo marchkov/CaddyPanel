@@ -63,8 +63,8 @@ $settings = [
     'panel_domain' => getenv('CADDYPANEL_PANEL_DOMAIN') ?: 'localhost',
     'admin_email' => getenv('CADDYPANEL_ADMIN_EMAIL') ?: 'admin@example.com',
     'ui_theme' => 'dark',
-    'default_php_version' => '8.4',
-    'default_php_fpm_socket' => '/run/php/php8.4-fpm.sock',
+    'default_php_version' => getenv('CADDYPANEL_DEFAULT_PHP_VERSION') ?: '8.4',
+    'default_php_fpm_socket' => getenv('CADDYPANEL_DEFAULT_PHP_FPM_SOCKET') ?: '/run/php/php8.4-fpm.sock',
     'backup_retention_days' => '14',
     'updates_auto_check' => '1',
     'updates_branch' => 'main',
@@ -79,10 +79,13 @@ foreach ($settings as $key => $value) {
     }
 }
 
-if (!$database->fetch('SELECT id FROM php_versions WHERE version = ?', ['8.4'])) {
+$defaultPhpVersion = $settings['default_php_version'];
+$defaultPhpSocket = $settings['default_php_fpm_socket'];
+
+if (!$database->fetch('SELECT id FROM php_versions WHERE version = ?', [$defaultPhpVersion])) {
     $database->execute(
         'INSERT INTO php_versions (version, fpm_socket, is_default, detected_at) VALUES (?, ?, 1, ?)',
-        ['8.4', '/run/php/php8.4-fpm.sock', $now]
+        [$defaultPhpVersion, $defaultPhpSocket, $now]
     );
 }
 

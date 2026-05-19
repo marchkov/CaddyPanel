@@ -260,8 +260,10 @@ It installs packages, copies the app to `/opt/caddypanel`, initializes SQLite, c
 Target platform:
 
 ```text
-Debian 12/13 or Ubuntu 24.04 with PHP 8.4 packages available
+Debian 12/13 or Ubuntu 24.04
 ```
+
+The installer uses the PHP version provided by the distribution packages, then detects the matching PHP-FPM service and socket automatically.
 
 ## Production Installation
 
@@ -318,14 +320,14 @@ Post-install checks:
 
 ```bash
 systemctl status caddy --no-pager
-systemctl status php8.4-fpm --no-pager
+systemctl status 'php*-fpm' --no-pager
 systemctl status mariadb --no-pager
 caddy validate --config /etc/caddy/Caddyfile
 sudo -u www-data php /opt/caddypanel/bin/backup-scheduler.php
 sudo -u www-data php /opt/caddypanel/bin/update-cron.php
 ```
 
-If `apt` cannot find `php8.4-*` packages, stop and add the appropriate PHP package repository for your OS, or adjust `install.sh` to the installed PHP version before rerunning.
+The installer uses generic PHP packages such as `php-cli`, `php-fpm`, `php-sqlite3`, and `php-mysql`. It then detects the installed PHP-FPM service, for example `php8.3-fpm`, and writes the matching socket into CaddyPanel settings.
 
 If Caddy validation fails, inspect:
 

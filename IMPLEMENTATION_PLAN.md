@@ -447,7 +447,7 @@ Deliverables:
 - `install.sh`;
 - OS check;
 - package installation;
-- PHP 8.4 setup;
+- distro PHP setup with automatic PHP-FPM service/socket detection;
 - Caddy setup;
 - MariaDB setup;
 - service user creation;

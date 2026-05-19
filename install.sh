@@ -10,6 +10,9 @@ ADMIN_EMAIL=""
 ADMIN_USER="admin"
 ADMIN_PASSWORD=""
 MARIADB_SERVICE_USER="caddypanel_admin"
+PHP_VERSION=""
+PHP_FPM_SOCKET=""
+PHP_FPM_SERVICE=""
 
 require_root() {
     if [[ "${EUID}" -ne 0 ]]; then
@@ -54,16 +57,38 @@ install_packages() {
         sqlite3 \
         mariadb-server \
         caddy \
-        php8.4-cli \
-        php8.4-fpm \
-        php8.4-sqlite3 \
-        php8.4-mysql \
-        php8.4-mbstring \
-        php8.4-xml \
-        php8.4-curl \
-        php8.4-zip \
-        php8.4-gd \
-        php8.4-intl
+        php-cli \
+        php-fpm \
+        php-sqlite3 \
+        php-mysql \
+        php-mbstring \
+        php-xml \
+        php-curl \
+        php-zip \
+        php-gd \
+        php-intl
+}
+
+detect_php_runtime() {
+    PHP_VERSION="$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')"
+    PHP_FPM_SOCKET="/run/php/php${PHP_VERSION}-fpm.sock"
+    PHP_FPM_SERVICE="php${PHP_VERSION}-fpm"
+
+    if ! systemctl list-unit-files "${PHP_FPM_SERVICE}.service" --no-legend | grep -q "${PHP_FPM_SERVICE}.service"; then
+        PHP_FPM_SERVICE="$(systemctl list-unit-files 'php*-fpm.service' --no-legend | awk '{print $1}' | sed 's/\\.service$//' | sort -V | tail -n 1)"
+    fi
+
+    if [[ -z "$PHP_FPM_SERVICE" ]]; then
+        echo "Unable to detect PHP-FPM service." >&2
+        exit 2
+    fi
+
+    if [[ "$PHP_FPM_SERVICE" =~ php([0-9]+\.[0-9]+)-fpm ]]; then
+        PHP_VERSION="${BASH_REMATCH[1]}"
+        PHP_FPM_SOCKET="/run/php/php${PHP_VERSION}-fpm.sock"
+    fi
+
+    echo "Detected PHP ${PHP_VERSION}, PHP-FPM service ${PHP_FPM_SERVICE}, socket ${PHP_FPM_SOCKET}"
 }
 
 create_directories() {
@@ -198,6 +223,8 @@ initialize_panel() {
     CADDYPANEL_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
     CADDYPANEL_PANEL_DOMAIN="$PANEL_DOMAIN" \
     CADDYPANEL_ADMIN_EMAIL="$ADMIN_EMAIL" \
+    CADDYPANEL_DEFAULT_PHP_VERSION="$PHP_VERSION" \
+    CADDYPANEL_DEFAULT_PHP_FPM_SOCKET="$PHP_FPM_SOCKET" \
     APP_ENV=production \
     php "$APP_DIR/bin/init-production.php"
 
@@ -219,7 +246,10 @@ EOF
         printf '\nimport /etc/caddy/sites/*.caddy\n' >> /etc/caddy/Caddyfile
     fi
 
-    sed "s/{panel_domain}/$PANEL_DOMAIN/g" "$APP_DIR/caddy/templates/panel.caddy.tpl" > /etc/caddy/sites/caddypanel.caddy
+    sed \
+        -e "s/{panel_domain}/$PANEL_DOMAIN/g" \
+        -e "s#{panel_php_fpm_socket}#$PHP_FPM_SOCKET#g" \
+        "$APP_DIR/caddy/templates/panel.caddy.tpl" > /etc/caddy/sites/caddypanel.caddy
     caddy validate --config /etc/caddy/Caddyfile
 }
 
@@ -258,8 +288,8 @@ EOF
 }
 
 start_services() {
-    systemctl enable php8.4-fpm mariadb caddy
-    systemctl restart php8.4-fpm
+    systemctl enable "$PHP_FPM_SERVICE" mariadb caddy
+    systemctl restart "$PHP_FPM_SERVICE"
     systemctl restart mariadb
     systemctl reload caddy || systemctl restart caddy
 }
@@ -286,6 +316,7 @@ main() {
     require_root
     read_config
     install_packages
+    detect_php_runtime
     create_directories
     copy_application
     install_integrated_apps

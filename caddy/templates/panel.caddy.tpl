@@ -6,7 +6,7 @@
     redir /files /files/
 
     handle_path /files/* {
-        forward_auth unix//run/php/php8.4-fpm.sock {
+        forward_auth unix/{panel_php_fpm_socket} {
             uri /filegator-auth.php
             transport fastcgi {
                 root /opt/caddypanel/public
@@ -15,11 +15,11 @@
 
         root * /opt/caddypanel/apps/filegator/dist
         try_files {path} /caddypanel.php
-        php_fastcgi unix//run/php/php8.4-fpm.sock
+        php_fastcgi unix/{panel_php_fpm_socket}
         file_server
     }
 
-    php_fastcgi unix//run/php/php8.4-fpm.sock
+    php_fastcgi unix/{panel_php_fpm_socket}
     file_server
 
     log {
