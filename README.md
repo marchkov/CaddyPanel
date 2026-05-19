@@ -213,12 +213,24 @@ bin/update-apply
 bin/update-cron.php
 ```
 
-`update-check` fetches the configured Git remote/branch and reports whether the local checkout is behind. `update-apply` refuses dirty worktrees and applies only fast-forward updates.
+`update-check` fetches the configured Git repository and branch into `/opt/caddypanel/var/update-cache/repo`, then reports whether a newer revision is available. `update-apply` resets that cache to the selected branch and deploys panel code into `/opt/caddypanel` with `rsync`.
+
+The updater preserves production data:
+
+```text
+config/secret.key
+var/data/*.sqlite
+var/backups/
+var/logs/
+var/update-cache/
+apps/adminer/
+apps/filegator/
+```
 
 Automatic checks can be scheduled with cron:
 
 ```cron
-0 * * * * php /opt/caddypanel/bin/update-cron.php >/dev/null 2>&1
+0 * * * * www-data APP_ENV=production php /opt/caddypanel/bin/update-cron.php >/dev/null 2>&1
 ```
 
 ## Users

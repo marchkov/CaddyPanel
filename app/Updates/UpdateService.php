@@ -8,6 +8,8 @@ use CaddyPanel\System\CommandRunner;
 
 class UpdateService
 {
+    private const DEFAULT_REPOSITORY_URL = 'https://github.com/marchkov/CaddyPanel.git';
+
     public function __construct(
         private CommandRunner $commands,
         private SettingRepository $settings,
@@ -37,7 +39,9 @@ class UpdateService
         $branch = $this->settings->get('updates_branch', 'main') ?: 'main';
         $result = $this->commands->run('update-check', [
             'repo_path' => $this->repoPath,
+            'repository_url' => $this->repositoryUrl(),
             'branch' => $branch,
+            'cache_path' => $this->cachePath(),
         ]);
 
         $payload = [
@@ -58,7 +62,9 @@ class UpdateService
         $branch = $this->settings->get('updates_branch', 'main') ?: 'main';
         $result = $this->commands->run('update-apply', [
             'repo_path' => $this->repoPath,
+            'repository_url' => $this->repositoryUrl(),
             'branch' => $branch,
+            'cache_path' => $this->cachePath(),
         ]);
 
         $payload = [
@@ -77,14 +83,19 @@ class UpdateService
         return $payload;
     }
 
-    public function setConfig(bool $autoCheck, string $branch): void
+    public function setConfig(bool $autoCheck, string $branch, string $repositoryUrl): void
     {
         if (preg_match('/^[a-zA-Z0-9._\/-]+$/', $branch) !== 1) {
             throw new \InvalidArgumentException('Invalid branch name.');
         }
 
+        if (!filter_var($repositoryUrl, FILTER_VALIDATE_URL) && !preg_match('/^[a-zA-Z0-9_.-]+@[a-zA-Z0-9_.-]+:[a-zA-Z0-9_.\/-]+\.git$/', $repositoryUrl)) {
+            throw new \InvalidArgumentException('Invalid repository URL.');
+        }
+
         $this->settings->set('updates_auto_check', $autoCheck ? '1' : '0');
         $this->settings->set('updates_branch', $branch);
+        $this->settings->set('updates_repository_url', $repositoryUrl);
     }
 
     public function config(): array
@@ -92,7 +103,20 @@ class UpdateService
         return [
             'auto_check' => $this->settings->get('updates_auto_check', '1') === '1',
             'branch' => $this->settings->get('updates_branch', 'main') ?: 'main',
+            'repository_url' => $this->repositoryUrl(),
+            'cache_path' => $this->cachePath(),
+            'app_path' => $this->repoPath,
         ];
+    }
+
+    private function repositoryUrl(): string
+    {
+        return $this->settings->get('updates_repository_url', self::DEFAULT_REPOSITORY_URL) ?: self::DEFAULT_REPOSITORY_URL;
+    }
+
+    private function cachePath(): string
+    {
+        return rtrim($this->repoPath, '/') . '/var/update-cache/repo';
     }
 
     private function audit(?int $userId, string $action, string $status, string $message, string $ipAddress): void

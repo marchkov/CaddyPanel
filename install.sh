@@ -335,8 +335,8 @@ configure_sudoers() {
 
 configure_cron() {
     cat > /etc/cron.d/caddypanel <<EOF
-* * * * * www-data php $APP_DIR/bin/backup-scheduler.php >/dev/null 2>&1
-0 * * * * www-data php $APP_DIR/bin/update-cron.php >/dev/null 2>&1
+* * * * * www-data APP_ENV=production php $APP_DIR/bin/backup-scheduler.php >/dev/null 2>&1
+0 * * * * www-data APP_ENV=production php $APP_DIR/bin/update-cron.php >/dev/null 2>&1
 EOF
     chmod 644 /etc/cron.d/caddypanel
 }

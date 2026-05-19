@@ -54,6 +54,7 @@ class DevBootstrap
             'backup_retention_days' => '14',
             'updates_auto_check' => '1',
             'updates_branch' => 'main',
+            'updates_repository_url' => 'https://github.com/marchkov/CaddyPanel.git',
         ];
 
         foreach ($settings as $key => $value) {

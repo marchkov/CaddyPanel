@@ -3,18 +3,22 @@
 set -euo pipefail
 
 REPO_PATH=""
+REPOSITORY_URL=""
 BRANCH=""
+CACHE_PATH=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         repo_path) REPO_PATH="${2:-}"; shift 2 ;;
+        repository_url) REPOSITORY_URL="${2:-}"; shift 2 ;;
         branch) BRANCH="${2:-}"; shift 2 ;;
+        cache_path) CACHE_PATH="${2:-}"; shift 2 ;;
         *) echo "Unknown argument: $1" >&2; exit 2 ;;
     esac
 done
 
-if [[ -z "$REPO_PATH" || -z "$BRANCH" ]]; then
-    echo "Usage: update-apply repo_path <path> branch <branch>" >&2
+if [[ -z "$REPO_PATH" || -z "$REPOSITORY_URL" || -z "$BRANCH" || -z "$CACHE_PATH" ]]; then
+    echo "Usage: update-apply repo_path <path> repository_url <url> branch <branch> cache_path <path>" >&2
     exit 2
 fi
 
@@ -23,26 +27,48 @@ if [[ "$BRANCH" =~ [^a-zA-Z0-9._/-] ]]; then
     exit 2
 fi
 
-cd "$REPO_PATH"
+EXPECTED_CACHE="$REPO_PATH/var/update-cache/repo"
 
-if [[ ! -d .git ]]; then
-    echo "not a git repository" >&2
-    exit 1
+if [[ "$CACHE_PATH" != "$EXPECTED_CACHE" ]]; then
+    echo "Cache path must be $EXPECTED_CACHE" >&2
+    exit 2
 fi
 
-if [[ -n "$(git status --porcelain)" ]]; then
-    echo "refusing update: worktree has uncommitted changes" >&2
-    exit 1
+mkdir -p "$(dirname "$CACHE_PATH")"
+
+if [[ ! -d "$CACHE_PATH/.git" ]]; then
+    rm -rf -- "$CACHE_PATH"
+    git clone --quiet --branch "$BRANCH" "$REPOSITORY_URL" "$CACHE_PATH"
 fi
 
-REMOTE="$(git remote | head -n 1 || true)"
+cd "$CACHE_PATH"
+git -c safe.directory="$CACHE_PATH" remote set-url origin "$REPOSITORY_URL"
+git -c safe.directory="$CACHE_PATH" fetch origin "$BRANCH" --quiet
+git -c safe.directory="$CACHE_PATH" checkout --quiet "$BRANCH"
+git -c safe.directory="$CACHE_PATH" reset --hard "origin/$BRANCH" --quiet
 
-if [[ -z "$REMOTE" ]]; then
-    echo "no git remote configured" >&2
-    exit 1
+TARGET_REV="$(git -c safe.directory="$CACHE_PATH" rev-parse HEAD)"
+
+rsync -a --delete \
+    --exclude ".git" \
+    --exclude "apps/adminer/***" \
+    --exclude "apps/filegator/***" \
+    --exclude "config/secret.key" \
+    --exclude "var/data/*.sqlite" \
+    --exclude "var/generated/caddy/*.pending" \
+    --exclude "var/backups/***" \
+    --exclude "var/logs/***" \
+    --exclude "var/update-cache/***" \
+    ./ "$REPO_PATH/"
+
+find "$REPO_PATH/bin" -type f -exec chmod 755 {} \;
+chown -R www-data:www-data "$REPO_PATH"
+chown root:www-data "$REPO_PATH/config"
+chmod 750 "$REPO_PATH/config"
+
+if [[ -f "$REPO_PATH/config/secret.key" ]]; then
+    chown root:www-data "$REPO_PATH/config/secret.key"
+    chmod 640 "$REPO_PATH/config/secret.key"
 fi
 
-git fetch "$REMOTE" "$BRANCH" --quiet
-git merge --ff-only "$REMOTE/$BRANCH"
-
-echo "updated to $(git rev-parse HEAD)"
+echo "updated panel code to $TARGET_REV"

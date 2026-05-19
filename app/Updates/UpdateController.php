@@ -49,7 +49,11 @@ class UpdateController
             $action = (string) $request->post('action', '');
 
             if ($action === 'save_config') {
-                $this->updates->setConfig(!empty($_POST['auto_check']), trim((string) $request->post('branch', 'main')));
+                $this->updates->setConfig(
+                    !empty($_POST['auto_check']),
+                    trim((string) $request->post('branch', 'main')),
+                    trim((string) $request->post('repository_url', ''))
+                );
                 Response::redirect('/updates');
             }
 

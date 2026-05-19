@@ -34,6 +34,10 @@
                     <input id="branch" name="branch" value="<?php echo htmlspecialchars($config['branch'], ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field">
+                    <label for="repository_url">Repository URL</label>
+                    <input id="repository_url" name="repository_url" value="<?php echo htmlspecialchars($config['repository_url'], ENT_QUOTES, 'UTF-8'); ?>">
+                </div>
+                <div class="field">
                     <label>
                         <input type="checkbox" name="auto_check" value="1" style="width: auto;" <?php echo $config['auto_check'] ? 'checked' : ''; ?>>
                         Enable automatic update checks
@@ -57,7 +61,7 @@
                     <button class="button primary" type="submit">Apply update</button>
                 </form>
             </div>
-            <p class="muted">Apply uses fast-forward only and refuses dirty worktrees.</p>
+            <p class="muted">Apply fetches the configured repository into a local cache and deploys panel code without touching database, secret key, backups, generated configs, or integrated apps.</p>
         </section>
 
         <section class="card">
