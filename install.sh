@@ -219,9 +219,19 @@ install_filegator() {
         cp "$APP_DIR/apps/filegator/configuration_sample.php" "$APP_DIR/apps/filegator/configuration.php"
     fi
 
-    if [[ ! -f "$APP_DIR/apps/filegator/private/users.json" && -f "$APP_DIR/apps/filegator/private/users.json.blank" ]]; then
-        cp "$APP_DIR/apps/filegator/private/users.json.blank" "$APP_DIR/apps/filegator/private/users.json"
-    fi
+    mkdir -p "$APP_DIR/apps/filegator/private"
+    cat > "$APP_DIR/apps/filegator/private/users.json" <<'JSON'
+{
+  "1": {
+    "username": "guest",
+    "name": "CaddyPanel",
+    "role": "guest",
+    "homedir": "/",
+    "permissions": "read|write|upload|download|batchdownload|zip|chmod",
+    "password": ""
+  }
+}
+JSON
 
     cat > "$APP_DIR/apps/filegator/dist/caddypanel.php" <<'PHP'
 <?php
