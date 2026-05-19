@@ -107,6 +107,17 @@ create_directories() {
         /var/log/caddypanel
 }
 
+configure_log_directory() {
+    local caddy_user="caddy"
+
+    if ! id -u "$caddy_user" >/dev/null 2>&1; then
+        caddy_user="www-data"
+    fi
+
+    chown "$caddy_user:$caddy_user" /var/log/caddypanel
+    chmod 750 /var/log/caddypanel
+}
+
 copy_application() {
     rsync -a --delete \
         --exclude ".git" \
@@ -338,6 +349,7 @@ main() {
     install_packages
     detect_php_runtime
     create_directories
+    configure_log_directory
     copy_application
     install_integrated_apps
     initialize_panel
