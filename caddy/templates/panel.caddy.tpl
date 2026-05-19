@@ -8,7 +8,7 @@
     handle_path /files/* {
         root * /opt/caddypanel/apps/filegator/dist
 
-        @static path /favicon.ico /manifest.json /robots.txt /service-worker.js /fonts/* /img/*
+        @static path /favicon.ico /manifest.json /robots.txt /service-worker.js /css/* /fonts/* /img/* /js/*
         handle @static {
             file_server
         }
