@@ -4,15 +4,41 @@ set -euo pipefail
 
 service_status() {
     local service="$1"
+
     if systemctl is-active --quiet "$service"; then
         echo "active"
+    elif systemctl list-unit-files "${service}.service" --no-legend 2>/dev/null | grep -q "${service}.service"; then
+        systemctl is-active "$service" 2>/dev/null || true
     else
-        systemctl is-active "$service" 2>/dev/null || echo "unknown"
+        echo "unknown"
     fi
 }
 
+php_fpm_status() {
+    local service
+
+    while IFS= read -r service; do
+        service="${service%.service}"
+
+        if systemctl is-active --quiet "$service"; then
+            echo "active ($service)"
+            return
+        fi
+    done < <(systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print $1}' | sort -V)
+
+    service="$(systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print $1}' | sort -V | tail -n 1)"
+
+    if [[ -n "$service" ]]; then
+        service="${service%.service}"
+        printf '%s (%s)\n' "$(service_status "$service")" "$service"
+        return
+    fi
+
+    echo "unknown"
+}
+
 CADDY_STATUS="$(service_status caddy)"
-PHP_STATUS="$(service_status php8.4-fpm)"
+PHP_STATUS="$(php_fpm_status)"
 MARIADB_STATUS="$(service_status mariadb)"
 DISK_USAGE="$(df -h / | awk 'NR==2 {print $3 "/" $2 " (" $5 ")"}')"
 
