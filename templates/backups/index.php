@@ -153,16 +153,18 @@
                             <td style="padding: 12px; border-bottom: 1px solid var(--border);"><?php echo htmlspecialchars($backup['status'], ENT_QUOTES, 'UTF-8'); ?></td>
                             <td style="padding: 12px; border-bottom: 1px solid var(--border);"><?php echo htmlspecialchars($backup['backup_file'] ?? '-', ENT_QUOTES, 'UTF-8'); ?></td>
                             <td style="padding: 12px; border-bottom: 1px solid var(--border);"><?php echo htmlspecialchars($backup['message'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
-                            <td style="padding: 12px; border-bottom: 1px solid var(--border); text-align: right;">
+                            <td style="padding: 12px; border-bottom: 1px solid var(--border);">
                                 <?php if ($backup['status'] === 'success'): ?>
-                                    <a class="button" href="/backups/<?php echo (int) $backup['id']; ?>/download">Download</a>
-                                    <a class="button" href="/restore/<?php echo (int) $backup['id']; ?>">Restore</a>
-                                    <form method="post" action="/backups/<?php echo (int) $backup['id']; ?>/delete" style="display: inline;" onsubmit="return confirm('Delete this backup?');">
-                                        <?php echo \CaddyPanel\Core\Csrf::input(); ?>
-                                        <button class="button" type="submit">Delete</button>
-                                    </form>
+                                    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; white-space: nowrap;">
+                                        <a class="button" href="/backups/<?php echo (int) $backup['id']; ?>/download">Download</a>
+                                        <a class="button" href="/restore/<?php echo (int) $backup['id']; ?>">Restore</a>
+                                        <form method="post" action="/backups/<?php echo (int) $backup['id']; ?>/delete" style="margin: 0;" onsubmit="return confirm('Delete this backup?');">
+                                            <?php echo \CaddyPanel\Core\Csrf::input(); ?>
+                                            <button class="button" type="submit">Delete</button>
+                                        </form>
+                                    </div>
                                 <?php else: ?>
-                                    <span class="muted">Pending</span>
+                                    <div style="text-align: right;"><span class="muted">Pending</span></div>
                                 <?php endif; ?>
                             </td>
                         </tr>
