@@ -5,7 +5,7 @@ set -euo pipefail
 APP_DIR="/opt/caddypanel"
 ADMINER_URL="${ADMINER_URL:-https://www.adminer.org/latest-mysql-en.php}"
 FILEGATOR_API_URL="${FILEGATOR_API_URL:-https://api.github.com/repos/filegator/filegator/releases/latest}"
-FILEGATOR_ZIP_URL="${FILEGATOR_ZIP_URL:-https://github.com/filegator/filegator/archive/refs/heads/master.zip}"
+FILEGATOR_ZIP_URL="${FILEGATOR_ZIP_URL:-https://github.com/filegator/static/raw/master/builds/filegator_latest.zip}"
 PANEL_DOMAIN=""
 ADMIN_EMAIL=""
 ADMIN_USER="admin"
@@ -177,17 +177,13 @@ install_filegator() {
                     exit(0);
                 }
             }
-            if (!empty($release["zipball_url"])) {
-                echo $release["zipball_url"];
-                exit(0);
-            }
             exit(0);
             '
         )"
     fi
 
     if [[ -z "${FILEGATOR_DOWNLOAD_URL:-}" ]]; then
-        echo "Using FileGator fallback ZIP URL because release metadata is unavailable or incomplete."
+        echo "Using FileGator precompiled ZIP URL because release metadata has no build asset."
         FILEGATOR_DOWNLOAD_URL="$FILEGATOR_ZIP_URL"
     fi
 
