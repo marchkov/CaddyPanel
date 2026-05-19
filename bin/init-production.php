@@ -15,8 +15,8 @@ if (!$username || !$password) {
     exit(2);
 }
 
-if (strlen($password) < 12) {
-    fwrite(STDERR, "Admin password must be at least 12 characters in production.\n");
+if (strlen($password) < 8) {
+    fwrite(STDERR, "Admin password must be at least 8 characters in production.\n");
     exit(2);
 }
 

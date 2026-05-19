@@ -23,7 +23,7 @@ read_config() {
     read -r -p "Admin email for Caddy TLS: " ADMIN_EMAIL
     read -r -p "Admin username [admin]: " ADMIN_USER_INPUT
     ADMIN_USER="${ADMIN_USER_INPUT:-admin}"
-    read -r -s -p "Admin password (min 12 chars): " ADMIN_PASSWORD
+    read -r -s -p "Admin password (min 8 chars): " ADMIN_PASSWORD
     echo
 
     if [[ -z "$PANEL_DOMAIN" || -z "$ADMIN_EMAIL" || -z "$ADMIN_USER" || -z "$ADMIN_PASSWORD" ]]; then
@@ -31,8 +31,8 @@ read_config() {
         exit 2
     fi
 
-    if [[ ${#ADMIN_PASSWORD} -lt 12 ]]; then
-        echo "Admin password must be at least 12 characters." >&2
+    if [[ ${#ADMIN_PASSWORD} -lt 8 ]]; then
+        echo "Admin password must be at least 8 characters." >&2
         exit 2
     fi
 

@@ -290,7 +290,7 @@ The installer prompts for:
 Panel domain
 Admin email for Caddy TLS
 Admin username
-Admin password
+Admin password, minimum 8 characters
 ```
 
 After install, open:
