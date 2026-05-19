@@ -219,6 +219,7 @@ The updater preserves production data:
 
 ```text
 config/secret.key
+config/mariadb-service.cnf
 var/data/*.sqlite
 var/backups/
 var/logs/

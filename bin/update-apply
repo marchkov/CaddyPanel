@@ -54,6 +54,7 @@ rsync -a --delete \
     --exclude "apps/adminer/***" \
     --exclude "apps/filegator/***" \
     --exclude "config/secret.key" \
+    --exclude "config/mariadb-service.cnf" \
     --exclude "var/data/*.sqlite" \
     --exclude "var/generated/caddy/*.pending" \
     --exclude "var/backups/***" \
