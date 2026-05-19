@@ -22,6 +22,7 @@
             </div>
             <div style="display: flex; gap: 10px;">
                 <a class="button" href="/sites">Back</a>
+                <a class="button" href="/sites/<?php echo (int) $site['id']; ?>/edit">Edit</a>
                 <a class="button" href="/logs/sites/<?php echo (int) $site['id']; ?>">Logs</a>
                 <a class="button" href="/sites/<?php echo (int) $site['id']; ?>/delete">Delete</a>
             </div>

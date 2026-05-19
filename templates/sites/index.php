@@ -67,6 +67,7 @@
                                 </td>
                                 <td style="padding: 12px; border-bottom: 1px solid var(--border); text-align: right;">
                                     <a class="button" href="/sites/<?php echo (int) $site['id']; ?>">View</a>
+                                    <a class="button" href="/sites/<?php echo (int) $site['id']; ?>/edit">Edit</a>
                                     <a class="button" href="/sites/<?php echo (int) $site['id']; ?>/delete">Delete</a>
                                 </td>
                             </tr>

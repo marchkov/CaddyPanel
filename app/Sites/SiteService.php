@@ -158,6 +158,71 @@ class SiteService
         return $siteId;
     }
 
+    public function update(int $siteId, array $input, int $userId, string $ipAddress): void
+    {
+        $site = $this->sites->find($siteId);
+
+        if (!$site || $site['deleted_at'] !== null) {
+            throw new \InvalidArgumentException('Site not found.');
+        }
+
+        $type = (string) ($input['type'] ?? $site['type']);
+        $phpVersion = trim((string) ($input['php_version'] ?? ($site['php_version'] ?? '')));
+
+        if (!Validator::siteType($type)) {
+            throw new \InvalidArgumentException('Invalid site type.');
+        }
+
+        if ($type === 'php' && preg_match('/^\d+\.\d+$/', $phpVersion) !== 1) {
+            throw new \InvalidArgumentException('Invalid PHP version.');
+        }
+
+        $phpVersionRow = null;
+
+        if ($type === 'php') {
+            $phpVersionRow = $this->phpVersions->findByVersion($phpVersion);
+
+            if (!$phpVersionRow) {
+                throw new \InvalidArgumentException('PHP version is not available.');
+            }
+        }
+
+        $aliases = $this->normalizeAliases((string) ($input['aliases'] ?? ''), !empty($input['add_www_alias']), $site['domain']);
+
+        foreach ($aliases as $alias) {
+            if ($this->sites->aliasExistsForOtherSite($alias, $siteId)) {
+                throw new \InvalidArgumentException('Alias already exists: ' . $alias);
+            }
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $siteData = array_merge($site, [
+            'type' => $type,
+            'php_enabled' => $type === 'php' ? 1 : 0,
+            'php_version' => $type === 'php' ? $phpVersion : null,
+            'php_fpm_socket' => $type === 'php' ? $phpVersionRow['fpm_socket'] : null,
+            'status' => 'draft',
+            'updated_at' => $now,
+        ]);
+
+        $this->sites->updateRuntime($siteId, $siteData, $aliases);
+        $message = 'Updated site settings.';
+
+        try {
+            $message .= ' Directory provisioning: ' . $this->provisioner->createDirectories($siteData);
+            $previewPath = $this->caddyRenderer->writePreview($siteData, $aliases);
+            $message .= ' Caddy config preview: ' . $previewPath;
+            $message .= ' Caddy apply: ' . $this->caddyApplier->applySiteConfig($site['domain'], $previewPath, $site['caddy_config_path']);
+            $this->sites->updateStatus($siteId, 'active', null);
+        } catch (\Throwable $exception) {
+            $this->sites->updateStatus($siteId, 'error', $exception->getMessage());
+            $this->audit($userId, 'site_update', $siteId, 'failed', $exception->getMessage(), $ipAddress);
+            throw $exception;
+        }
+
+        $this->audit($userId, 'site_update', $siteId, 'success', $message, $ipAddress);
+    }
+
     public function delete(int $siteId, array $input, int $userId, string $ipAddress): void
     {
         $site = $this->sites->find($siteId);

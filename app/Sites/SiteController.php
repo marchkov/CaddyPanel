@@ -62,6 +62,30 @@ class SiteController
         ]));
     }
 
+    public function edit(string $id): void
+    {
+        $this->guard->requireModule('sites', ($this->viewData)());
+        $this->guard->requireManagerOrAdmin();
+
+        $request = new Request();
+        $site = $this->sites->findWithAliases((int) $id);
+
+        if (!$site || $site['deleted_at'] !== null) {
+            Response::notFound();
+        }
+
+        if ($request->method() === 'POST') {
+            $this->handleEdit($request, (int) $id, $site);
+        }
+
+        Response::view('sites/edit', ($this->viewData)([
+            'site' => $site,
+            'error' => null,
+            'old' => $this->siteFormData($site),
+            'phpVersions' => $this->phpVersions->all(),
+        ]));
+    }
+
     public function delete(string $id): void
     {
         $this->guard->requireModule('sites', ($this->viewData)());
@@ -106,6 +130,30 @@ class SiteController
         }
     }
 
+    private function handleEdit(Request $request, int $siteId, array $site): void
+    {
+        if (!Csrf::validate($request->post('_csrf_token'))) {
+            Response::view('sites/edit', ($this->viewData)([
+                'site' => $site,
+                'error' => 'Invalid session token.',
+                'old' => $_POST,
+                'phpVersions' => $this->phpVersions->all(),
+            ]));
+        }
+
+        try {
+            $this->sites->update($siteId, $_POST, (int) $_SESSION['user']['id'], $request->ip());
+            Response::redirect('/sites/' . $siteId);
+        } catch (\Throwable $exception) {
+            Response::view('sites/edit', ($this->viewData)([
+                'site' => $site,
+                'error' => $exception->getMessage(),
+                'old' => $_POST,
+                'phpVersions' => $this->phpVersions->all(),
+            ]));
+        }
+    }
+
     private function handleDelete(Request $request, int $siteId, array $site): void
     {
         if (!Csrf::validate($request->post('_csrf_token'))) {
@@ -124,5 +172,25 @@ class SiteController
                 'error' => $exception->getMessage(),
             ]));
         }
+    }
+
+    private function siteFormData(array $site): array
+    {
+        $aliases = array_map(
+            static fn (array $alias): string => (string) $alias['domain'],
+            $site['aliases'] ?? []
+        );
+
+        $wwwAlias = 'www.' . $site['domain'];
+
+        return [
+            'type' => $site['type'],
+            'php_version' => $site['php_version'],
+            'add_www_alias' => in_array($wwwAlias, $aliases, true) ? '1' : '',
+            'aliases' => implode("\n", array_values(array_filter(
+                $aliases,
+                static fn (string $alias): bool => $alias !== $wwwAlias
+            ))),
+        ];
     }
 }

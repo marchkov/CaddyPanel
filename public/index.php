@@ -218,6 +218,8 @@ $router->get('/sites', [$siteController, 'index']);
 $router->get('/sites/create', [$siteController, 'create']);
 $router->post('/sites/create', [$siteController, 'create']);
 $router->get('/sites/{id}', [$siteController, 'show']);
+$router->get('/sites/{id}/edit', [$siteController, 'edit']);
+$router->post('/sites/{id}/edit', [$siteController, 'edit']);
 $router->get('/sites/{id}/delete', [$siteController, 'delete']);
 $router->post('/sites/{id}/delete', [$siteController, 'delete']);
 $router->get('/databases', [$databaseController, 'index']);

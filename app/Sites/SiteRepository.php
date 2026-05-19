@@ -136,6 +136,37 @@ class SiteRepository
         return $siteId;
     }
 
+    public function updateRuntime(int $siteId, array $data, array $aliases): void
+    {
+        $this->database->execute(
+            'UPDATE sites SET
+                type = ?,
+                php_enabled = ?,
+                php_version = ?,
+                php_fpm_socket = ?,
+                status = ?,
+                last_error = NULL,
+                updated_at = ?
+             WHERE id = ?',
+            [
+                $data['type'],
+                $data['php_enabled'],
+                $data['php_version'],
+                $data['php_fpm_socket'],
+                $data['status'],
+                $data['updated_at'],
+                $siteId,
+            ]
+        );
+
+        $this->replaceAliases($siteId, $aliases);
+    }
+
+    public function aliasExistsForOtherSite(string $domain, int $siteId): bool
+    {
+        return $this->aliasExists($domain, $siteId);
+    }
+
     public function aliases(int $siteId): array
     {
         return $this->database->fetchAll(
