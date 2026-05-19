@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+caddy validate --config /etc/caddy/Caddyfile
+systemctl reload caddy
+echo "caddy reloaded"

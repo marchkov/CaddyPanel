@@ -1,0 +1,8 @@
+/.env
+/var/data/*.sqlite
+/var/data/*.sqlite-*
+/var/logs/*.log
+/var/generated/caddy/*.pending
+/var/backups/*
+!/var/backups/.gitkeep
+/config/secret.key

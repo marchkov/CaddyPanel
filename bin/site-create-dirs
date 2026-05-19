@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DOMAIN=""
+TYPE="php"
+ROOT_PATH=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        domain) DOMAIN="${2:-}"; shift 2 ;;
+        type) TYPE="${2:-}"; shift 2 ;;
+        root_path) ROOT_PATH="${2:-}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ -z "$DOMAIN" || -z "$ROOT_PATH" ]]; then
+    echo "Usage: site-create-dirs domain <domain> type <php|static> root_path <path>" >&2
+    exit 2
+fi
+
+if [[ ! "$DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
+    echo "Invalid domain: $DOMAIN" >&2
+    exit 2
+fi
+
+if [[ "$TYPE" != "php" && "$TYPE" != "static" ]]; then
+    echo "Invalid site type: $TYPE" >&2
+    exit 2
+fi
+
+EXPECTED_ROOT="/var/www/sites/$DOMAIN"
+
+if [[ "$ROOT_PATH" != "$EXPECTED_ROOT" ]]; then
+    echo "Root path must be $EXPECTED_ROOT" >&2
+    exit 2
+fi
+
+mkdir -p "$ROOT_PATH/public" "$ROOT_PATH/private" "$ROOT_PATH/logs" "$ROOT_PATH/tmp"
+
+if [[ "$TYPE" == "php" && ! -f "$ROOT_PATH/public/index.php" ]]; then
+    cat > "$ROOT_PATH/public/index.php" <<'PHP'
+<?php
+echo 'Site is ready';
+PHP
+fi
+
+if [[ "$TYPE" == "static" && ! -f "$ROOT_PATH/public/index.html" ]]; then
+    cat > "$ROOT_PATH/public/index.html" <<'HTML'
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Site is ready</title></head>
+<body><h1>Site is ready</h1></body>
+</html>
+HTML
+fi
+
+chown -R www-data:www-data "$ROOT_PATH"
+find "$ROOT_PATH" -type d -exec chmod 755 {} \;
+find "$ROOT_PATH" -type f -exec chmod 644 {} \;
+
+echo "created directories for $DOMAIN"

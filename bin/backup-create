@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DOMAIN=""
+ROOT_PATH=""
+CONFIG_PATH=""
+BACKUP_DIR=""
+DATABASE_NAME=""
+INCLUDE_FILES="1"
+INCLUDE_DATABASE="1"
+INCLUDE_CADDY_CONFIG="1"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        domain) DOMAIN="${2:-}"; shift 2 ;;
+        root_path) ROOT_PATH="${2:-}"; shift 2 ;;
+        config_path) CONFIG_PATH="${2:-}"; shift 2 ;;
+        backup_dir) BACKUP_DIR="${2:-}"; shift 2 ;;
+        database_name) DATABASE_NAME="${2:-}"; shift 2 ;;
+        include_files) INCLUDE_FILES="${2:-1}"; shift 2 ;;
+        include_database) INCLUDE_DATABASE="${2:-1}"; shift 2 ;;
+        include_caddy_config) INCLUDE_CADDY_CONFIG="${2:-1}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ -z "$DOMAIN" || -z "$ROOT_PATH" || -z "$CONFIG_PATH" || -z "$BACKUP_DIR" ]]; then
+    echo "Usage: backup-create domain <domain> root_path <path> config_path <path> backup_dir <path>" >&2
+    exit 2
+fi
+
+if [[ ! "$DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
+    echo "Invalid domain: $DOMAIN" >&2
+    exit 2
+fi
+
+EXPECTED_ROOT="/var/www/sites/$DOMAIN"
+
+if [[ "$ROOT_PATH" != "$EXPECTED_ROOT" ]]; then
+    echo "Root path must be $EXPECTED_ROOT" >&2
+    exit 2
+fi
+
+if [[ -n "$DATABASE_NAME" && ! "$DATABASE_NAME" =~ ^[a-z][a-z0-9_]{0,11}$ ]]; then
+    echo "Invalid database name: $DATABASE_NAME" >&2
+    exit 2
+fi
+
+mkdir -p "$BACKUP_DIR/$DOMAIN"
+
+STAMP="$(date +%Y%m%d%H%M%S%N)"
+WORK_DIR="$(mktemp -d)"
+ARCHIVE="$BACKUP_DIR/$DOMAIN/$DOMAIN-$STAMP.tar.gz"
+
+cleanup() {
+    rm -rf "$WORK_DIR"
+}
+trap cleanup EXIT
+
+mkdir -p "$WORK_DIR/files" "$WORK_DIR/database" "$WORK_DIR/caddy" "$WORK_DIR/metadata"
+
+if [[ "$INCLUDE_FILES" == "1" && -d "$ROOT_PATH" ]]; then
+    cp -a "$ROOT_PATH/." "$WORK_DIR/files/"
+fi
+
+if [[ "$INCLUDE_CADDY_CONFIG" == "1" && -f "$CONFIG_PATH" ]]; then
+    cp "$CONFIG_PATH" "$WORK_DIR/caddy/$DOMAIN.caddy"
+fi
+
+DATABASE_INCLUDED="false"
+
+if [[ "$INCLUDE_DATABASE" == "1" && -n "$DATABASE_NAME" ]]; then
+    mysqldump --defaults-extra-file=/opt/caddypanel/config/mariadb-service.cnf \
+        --single-transaction \
+        --routines \
+        --triggers \
+        "$DATABASE_NAME" > "$WORK_DIR/database/$DATABASE_NAME.sql"
+    DATABASE_INCLUDED="true"
+fi
+
+cat > "$WORK_DIR/manifest.json" <<JSON
+{
+  "domain": "$DOMAIN",
+  "created_at": "$(date -Iseconds)",
+  "contains": {
+    "files": $([[ "$INCLUDE_FILES" == "1" ]] && echo true || echo false),
+    "database": $DATABASE_INCLUDED,
+    "caddy": $([[ "$INCLUDE_CADDY_CONFIG" == "1" ]] && echo true || echo false),
+    "metadata": true
+  },
+  "database": {
+    "name": "$DATABASE_NAME"
+  }
+}
+JSON
+
+tar -czf "$ARCHIVE" -C "$WORK_DIR" .
+
+echo "$ARCHIVE"

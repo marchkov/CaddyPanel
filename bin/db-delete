@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+NAME=""
+USERNAME=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        name) NAME="${2:-}"; shift 2 ;;
+        username) USERNAME="${2:-}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ -z "$NAME" || -z "$USERNAME" ]]; then
+    echo "Usage: db-delete name <name> username <username>" >&2
+    exit 2
+fi
+
+if [[ ! "$NAME" =~ ^[a-z][a-z0-9_]{0,11}$ || ! "$USERNAME" =~ ^[a-z][a-z0-9_]{0,11}$ ]]; then
+    echo "Invalid database name or username" >&2
+    exit 2
+fi
+
+mysql --defaults-extra-file=/opt/caddypanel/config/mariadb-service.cnf <<SQL
+DROP DATABASE IF EXISTS \`$NAME\`;
+DROP USER IF EXISTS '$USERNAME'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+
+echo "deleted database $NAME"

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+REPO_PATH=""
+BRANCH=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        repo_path) REPO_PATH="${2:-}"; shift 2 ;;
+        branch) BRANCH="${2:-}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ -z "$REPO_PATH" || -z "$BRANCH" ]]; then
+    echo "Usage: update-apply repo_path <path> branch <branch>" >&2
+    exit 2
+fi
+
+if [[ "$BRANCH" =~ [^a-zA-Z0-9._/-] ]]; then
+    echo "Invalid branch: $BRANCH" >&2
+    exit 2
+fi
+
+cd "$REPO_PATH"
+
+if [[ ! -d .git ]]; then
+    echo "not a git repository" >&2
+    exit 1
+fi
+
+if [[ -n "$(git status --porcelain)" ]]; then
+    echo "refusing update: worktree has uncommitted changes" >&2
+    exit 1
+fi
+
+REMOTE="$(git remote | head -n 1 || true)"
+
+if [[ -z "$REMOTE" ]]; then
+    echo "no git remote configured" >&2
+    exit 1
+fi
+
+git fetch "$REMOTE" "$BRANCH" --quiet
+git merge --ff-only "$REMOTE/$BRANCH"
+
+echo "updated to $(git rev-parse HEAD)"

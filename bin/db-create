@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+NAME=""
+USERNAME=""
+PASSWORD=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        name) NAME="${2:-}"; shift 2 ;;
+        username) USERNAME="${2:-}"; shift 2 ;;
+        password) PASSWORD="${2:-}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ -z "$NAME" || -z "$USERNAME" || -z "$PASSWORD" ]]; then
+    echo "Usage: db-create name <name> username <username> password <password>" >&2
+    exit 2
+fi
+
+if [[ ! "$NAME" =~ ^[a-z][a-z0-9_]{0,11}$ || ! "$USERNAME" =~ ^[a-z][a-z0-9_]{0,11}$ ]]; then
+    echo "Invalid database name or username" >&2
+    exit 2
+fi
+
+mysql --defaults-extra-file=/opt/caddypanel/config/mariadb-service.cnf <<SQL
+CREATE DATABASE \`$NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER '$USERNAME'@'localhost' IDENTIFIED BY '$PASSWORD';
+GRANT ALL PRIVILEGES ON \`$NAME\`.* TO '$USERNAME'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+
+echo "created database $NAME"

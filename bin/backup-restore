@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+BACKUP_FILE=""
+RESTORE_DIR=""
+DOMAIN=""
+ROOT_PATH=""
+CONFIG_PATH=""
+RESTORE_FILES="0"
+RESTORE_DATABASE="0"
+RESTORE_HOST_CONFIG="0"
+DATABASE_NAME=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        backup_file) BACKUP_FILE="${2:-}"; shift 2 ;;
+        restore_dir) RESTORE_DIR="${2:-}"; shift 2 ;;
+        domain) DOMAIN="${2:-}"; shift 2 ;;
+        root_path) ROOT_PATH="${2:-}"; shift 2 ;;
+        config_path) CONFIG_PATH="${2:-}"; shift 2 ;;
+        restore_files) RESTORE_FILES="${2:-0}"; shift 2 ;;
+        restore_database) RESTORE_DATABASE="${2:-0}"; shift 2 ;;
+        restore_host_config) RESTORE_HOST_CONFIG="${2:-0}"; shift 2 ;;
+        database_name) DATABASE_NAME="${2:-}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ -z "$BACKUP_FILE" || -z "$RESTORE_DIR" || -z "$DOMAIN" || -z "$ROOT_PATH" || -z "$CONFIG_PATH" ]]; then
+    echo "Usage: backup-restore backup_file <path> restore_dir <path> domain <domain> root_path <path> config_path <path>" >&2
+    exit 2
+fi
+
+if [[ ! "$DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
+    echo "Invalid domain: $DOMAIN" >&2
+    exit 2
+fi
+
+EXPECTED_ROOT="/var/www/sites/$DOMAIN"
+EXPECTED_CONFIG="/etc/caddy/sites/$DOMAIN.caddy"
+
+if [[ "$ROOT_PATH" != "$EXPECTED_ROOT" ]]; then
+    echo "Root path must be $EXPECTED_ROOT" >&2
+    exit 2
+fi
+
+if [[ "$CONFIG_PATH" != "$EXPECTED_CONFIG" ]]; then
+    echo "Config path must be $EXPECTED_CONFIG" >&2
+    exit 2
+fi
+
+if [[ -n "$DATABASE_NAME" && ! "$DATABASE_NAME" =~ ^[a-z][a-z0-9_]{0,11}$ ]]; then
+    echo "Invalid database name: $DATABASE_NAME" >&2
+    exit 2
+fi
+
+if [[ ! -f "$BACKUP_FILE" ]]; then
+    echo "Backup file not found: $BACKUP_FILE" >&2
+    exit 2
+fi
+
+mkdir -p "$RESTORE_DIR"
+PRE_RESTORE_DIR="$RESTORE_DIR/pre-restore"
+mkdir -p "$PRE_RESTORE_DIR"
+
+case "$BACKUP_FILE" in
+    *.tar.gz|*.tgz)
+        tar -tzf "$BACKUP_FILE" | grep -q 'manifest.json' || {
+            echo "Backup archive does not contain manifest.json" >&2
+            exit 2
+        }
+        tar -xzf "$BACKUP_FILE" -C "$RESTORE_DIR"
+        ;;
+    *.manifest.json)
+        cp "$BACKUP_FILE" "$RESTORE_DIR/manifest.json"
+        ;;
+    *)
+        echo "Unsupported backup file type: $BACKUP_FILE" >&2
+        exit 2
+        ;;
+esac
+
+if [[ "$RESTORE_FILES" == "1" ]]; then
+    if [[ ! -d "$RESTORE_DIR/files" ]]; then
+        echo "Backup does not contain files/" >&2
+        exit 2
+    fi
+
+    NEW_ROOT="$RESTORE_DIR/files-new"
+    rm -rf "$NEW_ROOT"
+    mkdir -p "$NEW_ROOT"
+    cp -a "$RESTORE_DIR/files/." "$NEW_ROOT/"
+    chown -R www-data:www-data "$NEW_ROOT"
+
+    if [[ -d "$ROOT_PATH" ]]; then
+        mkdir -p "$PRE_RESTORE_DIR"
+        mv "$ROOT_PATH" "$PRE_RESTORE_DIR/files-current"
+    fi
+
+    mkdir -p "$(dirname "$ROOT_PATH")"
+    mv "$NEW_ROOT" "$ROOT_PATH"
+fi
+
+if [[ "$RESTORE_DATABASE" == "1" ]]; then
+    if [[ -z "$DATABASE_NAME" ]]; then
+        echo "database_name is required when restore_database is enabled." >&2
+        exit 2
+    fi
+
+    if [[ ! -d "$RESTORE_DIR/database" ]] || ! compgen -G "$RESTORE_DIR/database/*.sql" > /dev/null; then
+        echo "Backup does not contain database SQL dumps." >&2
+        exit 2
+    fi
+
+    SOURCE_DUMP="$RESTORE_DIR/database/$DATABASE_NAME.sql"
+
+    if [[ ! -f "$SOURCE_DUMP" ]]; then
+        SQL_COUNT="$(find "$RESTORE_DIR/database" -maxdepth 1 -type f -name '*.sql' | wc -l)"
+
+        if [[ "$SQL_COUNT" -eq 1 ]]; then
+            SOURCE_DUMP="$(find "$RESTORE_DIR/database" -maxdepth 1 -type f -name '*.sql' | head -n 1)"
+        else
+            echo "Backup does not contain a matching SQL dump for $DATABASE_NAME." >&2
+            exit 2
+        fi
+    fi
+
+    mysql --defaults-extra-file=/opt/caddypanel/config/mariadb-service.cnf "$DATABASE_NAME" < "$SOURCE_DUMP"
+fi
+
+if [[ "$RESTORE_HOST_CONFIG" == "1" ]]; then
+    SOURCE_CONFIG="$RESTORE_DIR/caddy/$DOMAIN.caddy"
+
+    if [[ ! -f "$SOURCE_CONFIG" ]]; then
+        echo "Backup does not contain caddy/$DOMAIN.caddy" >&2
+        exit 2
+    fi
+
+    if [[ -f "$CONFIG_PATH" ]]; then
+        cp "$CONFIG_PATH" "$PRE_RESTORE_DIR/$DOMAIN.caddy.current"
+    fi
+
+    cp "$SOURCE_CONFIG" "$CONFIG_PATH"
+
+    if ! caddy validate --config /etc/caddy/Caddyfile; then
+        if [[ -f "$PRE_RESTORE_DIR/$DOMAIN.caddy.current" ]]; then
+            cp "$PRE_RESTORE_DIR/$DOMAIN.caddy.current" "$CONFIG_PATH"
+        else
+            rm -f "$CONFIG_PATH"
+        fi
+        echo "Restored Caddy config failed validation and was rolled back." >&2
+        exit 1
+    fi
+
+    if ! systemctl reload caddy; then
+        if [[ -f "$PRE_RESTORE_DIR/$DOMAIN.caddy.current" ]]; then
+            cp "$PRE_RESTORE_DIR/$DOMAIN.caddy.current" "$CONFIG_PATH"
+            caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy || true
+        fi
+        echo "Caddy reload failed after restore." >&2
+        exit 1
+    fi
+fi
+
+echo "restore completed using staging directory $RESTORE_DIR"

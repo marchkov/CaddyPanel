@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DOMAIN=""
+ROOT_PATH=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        domain) DOMAIN="${2:-}"; shift 2 ;;
+        root_path) ROOT_PATH="${2:-}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ -z "$DOMAIN" || -z "$ROOT_PATH" ]]; then
+    echo "Usage: site-delete-files domain <domain> root_path <path>" >&2
+    exit 2
+fi
+
+if [[ ! "$DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
+    echo "Invalid domain: $DOMAIN" >&2
+    exit 2
+fi
+
+EXPECTED_ROOT="/var/www/sites/$DOMAIN"
+
+if [[ "$ROOT_PATH" != "$EXPECTED_ROOT" ]]; then
+    echo "Root path must be $EXPECTED_ROOT" >&2
+    exit 2
+fi
+
+if [[ "$ROOT_PATH" == "/" || "$ROOT_PATH" == "/var/www" || "$ROOT_PATH" == "/var/www/sites" ]]; then
+    echo "Refusing dangerous path: $ROOT_PATH" >&2
+    exit 2
+fi
+
+if [[ -d "$ROOT_PATH" ]]; then
+    rm -rf -- "$ROOT_PATH"
+fi
+
+echo "deleted files for $DOMAIN"

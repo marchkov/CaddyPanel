@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+first=1
+printf '['
+
+for socket in /run/php/php*-fpm.sock; do
+    if [ ! -S "$socket" ] && [ ! -e "$socket" ]; then
+        continue
+    fi
+
+    base="$(basename "$socket")"
+    version="${base#php}"
+    version="${version%-fpm.sock}"
+
+    if [[ ! "$version" =~ ^[0-9]+\.[0-9]+$ ]]; then
+        continue
+    fi
+
+    if [ "$first" -eq 0 ]; then
+        printf ','
+    fi
+
+    first=0
+    printf '{"version":"%s","fpm_socket":"%s","is_default":0}' "$version" "$socket"
+done
+
+printf ']\n'

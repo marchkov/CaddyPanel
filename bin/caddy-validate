@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+CONFIG_PATH="${1:-/etc/caddy/Caddyfile}"
+
+if [[ ! -f "$CONFIG_PATH" ]]; then
+    echo "Config file not found: $CONFIG_PATH" >&2
+    exit 2
+fi
+
+caddy validate --config "$CONFIG_PATH"

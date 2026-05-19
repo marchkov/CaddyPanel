@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DOMAIN=""
+PENDING_PATH=""
+FINAL_PATH=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        domain) DOMAIN="${2:-}"; shift 2 ;;
+        pending_path) PENDING_PATH="${2:-}"; shift 2 ;;
+        final_path) FINAL_PATH="${2:-}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ -z "$DOMAIN" || -z "$PENDING_PATH" || -z "$FINAL_PATH" ]]; then
+    echo "Usage: caddy-apply-site-config domain <domain> pending_path <path> final_path <path>" >&2
+    exit 2
+fi
+
+if [[ ! "$DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
+    echo "Invalid domain: $DOMAIN" >&2
+    exit 2
+fi
+
+EXPECTED_FINAL="/etc/caddy/sites/$DOMAIN.caddy"
+
+if [[ "$FINAL_PATH" != "$EXPECTED_FINAL" ]]; then
+    echo "Final path must be $EXPECTED_FINAL" >&2
+    exit 2
+fi
+
+if [[ ! -f "$PENDING_PATH" ]]; then
+    echo "Pending config not found: $PENDING_PATH" >&2
+    exit 2
+fi
+
+mkdir -p /etc/caddy/sites
+
+caddy validate --config "$PENDING_PATH"
+
+BACKUP_PATH=""
+if [[ -f "$FINAL_PATH" ]]; then
+    BACKUP_PATH="$FINAL_PATH.bak.$(date +%Y%m%d%H%M%S)"
+    cp -- "$FINAL_PATH" "$BACKUP_PATH"
+fi
+
+cp -- "$PENDING_PATH" "$FINAL_PATH"
+
+if ! caddy validate --config /etc/caddy/Caddyfile; then
+    if [[ -n "$BACKUP_PATH" && -f "$BACKUP_PATH" ]]; then
+        cp -- "$BACKUP_PATH" "$FINAL_PATH"
+    else
+        rm -f -- "$FINAL_PATH"
+    fi
+    echo "Full Caddy validation failed; rolled back $FINAL_PATH" >&2
+    exit 1
+fi
+
+if ! systemctl reload caddy; then
+    if [[ -n "$BACKUP_PATH" && -f "$BACKUP_PATH" ]]; then
+        cp -- "$BACKUP_PATH" "$FINAL_PATH"
+        caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1 || true
+        systemctl reload caddy >/dev/null 2>&1 || true
+    fi
+    echo "Caddy reload failed" >&2
+    exit 1
+fi
+
+echo "applied Caddy config for $DOMAIN"

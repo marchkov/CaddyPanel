@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+service_status() {
+    local service="$1"
+    if systemctl is-active --quiet "$service"; then
+        echo "active"
+    else
+        systemctl is-active "$service" 2>/dev/null || echo "unknown"
+    fi
+}
+
+CADDY_STATUS="$(service_status caddy)"
+PHP_STATUS="$(service_status php8.4-fpm)"
+MARIADB_STATUS="$(service_status mariadb)"
+DISK_USAGE="$(df -h / | awk 'NR==2 {print $3 "/" $2 " (" $5 ")"}')"
+
+printf '{"caddy":"%s","php_fpm":"%s","mariadb":"%s","disk":"%s"}\n' \
+    "$CADDY_STATUS" \
+    "$PHP_STATUS" \
+    "$MARIADB_STATUS" \
+    "$DISK_USAGE"

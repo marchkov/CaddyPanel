@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DOMAIN=""
+CONFIG_PATH=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        domain) DOMAIN="${2:-}"; shift 2 ;;
+        config_path) CONFIG_PATH="${2:-}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ -z "$DOMAIN" || -z "$CONFIG_PATH" ]]; then
+    echo "Usage: caddy-disable-site domain <domain> config_path <path>" >&2
+    exit 2
+fi
+
+if [[ ! "$DOMAIN" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$ ]]; then
+    echo "Invalid domain: $DOMAIN" >&2
+    exit 2
+fi
+
+EXPECTED_PATH="/etc/caddy/sites/$DOMAIN.caddy"
+
+if [[ "$CONFIG_PATH" != "$EXPECTED_PATH" ]]; then
+    echo "Config path must be $EXPECTED_PATH" >&2
+    exit 2
+fi
+
+if [[ -f "$CONFIG_PATH" ]]; then
+    mv -- "$CONFIG_PATH" "$CONFIG_PATH.disabled.$(date +%Y%m%d%H%M%S)"
+fi
+
+caddy validate --config /etc/caddy/Caddyfile
+systemctl reload caddy
+
+echo "disabled Caddy config for $DOMAIN"
