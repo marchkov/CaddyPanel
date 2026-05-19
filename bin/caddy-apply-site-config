@@ -39,7 +39,7 @@ fi
 
 mkdir -p /etc/caddy/sites
 
-caddy validate --config "$PENDING_PATH"
+caddy validate --adapter caddyfile --config "$PENDING_PATH"
 
 BACKUP_PATH=""
 if [[ -f "$FINAL_PATH" ]]; then
@@ -49,7 +49,7 @@ fi
 
 cp -- "$PENDING_PATH" "$FINAL_PATH"
 
-if ! caddy validate --config /etc/caddy/Caddyfile; then
+if ! caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile; then
     if [[ -n "$BACKUP_PATH" && -f "$BACKUP_PATH" ]]; then
         cp -- "$BACKUP_PATH" "$FINAL_PATH"
     else
@@ -62,7 +62,7 @@ fi
 if ! systemctl reload caddy; then
     if [[ -n "$BACKUP_PATH" && -f "$BACKUP_PATH" ]]; then
         cp -- "$BACKUP_PATH" "$FINAL_PATH"
-        caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1 || true
+        caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile >/dev/null 2>&1 || true
         systemctl reload caddy >/dev/null 2>&1 || true
     fi
     echo "Caddy reload failed" >&2

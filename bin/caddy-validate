@@ -9,4 +9,4 @@ if [[ ! -f "$CONFIG_PATH" ]]; then
     exit 2
 fi
 
-caddy validate --config "$CONFIG_PATH"
+caddy validate --adapter caddyfile --config "$CONFIG_PATH"

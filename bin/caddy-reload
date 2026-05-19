@@ -2,6 +2,6 @@
 
 set -euo pipefail
 
-caddy validate --config /etc/caddy/Caddyfile
+caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile
 systemctl reload caddy
 echo "caddy reloaded"

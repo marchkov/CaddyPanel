@@ -143,7 +143,7 @@ if [[ "$RESTORE_HOST_CONFIG" == "1" ]]; then
 
     cp "$SOURCE_CONFIG" "$CONFIG_PATH"
 
-    if ! caddy validate --config /etc/caddy/Caddyfile; then
+    if ! caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile; then
         if [[ -f "$PRE_RESTORE_DIR/$DOMAIN.caddy.current" ]]; then
             cp "$PRE_RESTORE_DIR/$DOMAIN.caddy.current" "$CONFIG_PATH"
         else
@@ -156,7 +156,7 @@ if [[ "$RESTORE_HOST_CONFIG" == "1" ]]; then
     if ! systemctl reload caddy; then
         if [[ -f "$PRE_RESTORE_DIR/$DOMAIN.caddy.current" ]]; then
             cp "$PRE_RESTORE_DIR/$DOMAIN.caddy.current" "$CONFIG_PATH"
-            caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy || true
+            caddy validate --adapter caddyfile --config /etc/caddy/Caddyfile && systemctl reload caddy || true
         fi
         echo "Caddy reload failed after restore." >&2
         exit 1
