@@ -94,8 +94,11 @@ detect_php_runtime() {
 
 create_directories() {
     mkdir -p "$APP_DIR" \
-        "$APP_DIR/data" \
         "$APP_DIR/config" \
+        "$APP_DIR/var/data" \
+        "$APP_DIR/var/generated/caddy" \
+        "$APP_DIR/var/backups" \
+        "$APP_DIR/var/logs" \
         "$APP_DIR/apps/adminer" \
         "$APP_DIR/apps/filegator" \
         /etc/caddy/sites \
@@ -237,7 +240,8 @@ initialize_panel() {
 
     chown root:www-data "$APP_DIR/config/secret.key"
     chmod 640 "$APP_DIR/config/secret.key"
-    chown -R www-data:www-data "$APP_DIR/data" "$APP_DIR/var"
+    mkdir -p "$APP_DIR/var/data" "$APP_DIR/var/generated/caddy" "$APP_DIR/var/backups" "$APP_DIR/var/logs"
+    chown -R www-data:www-data "$APP_DIR/var"
 }
 
 configure_caddy() {
