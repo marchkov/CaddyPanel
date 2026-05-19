@@ -53,13 +53,20 @@ class BackupProvisioner
 
     private function createLocalManifest(array $site, ?array $database = null, array $options = []): array
     {
-        $directory = rtrim($this->backupPath, '/\\') . '/' . $site['domain'];
+        $directory = rtrim($this->backupPath, '/\\');
 
         if (!is_dir($directory)) {
             mkdir($directory, 0775, true);
         }
 
-        $file = $directory . '/' . $site['domain'] . '-' . date('YmdHis') . '-' . bin2hex(random_bytes(4)) . '.manifest.json';
+        $date = date('Ymd');
+        $number = 1;
+
+        do {
+            $file = sprintf('%s/%s-%s_%02d.manifest.json', $directory, $site['domain'], $date, $number);
+            $number++;
+        } while (is_file($file));
+
         $manifest = [
             'domain' => $site['domain'],
             'created_at' => date(DATE_ATOM),

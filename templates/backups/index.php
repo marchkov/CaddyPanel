@@ -157,6 +157,10 @@
                                 <?php if ($backup['status'] === 'success'): ?>
                                     <a class="button" href="/backups/<?php echo (int) $backup['id']; ?>/download">Download</a>
                                     <a class="button" href="/restore/<?php echo (int) $backup['id']; ?>">Restore</a>
+                                    <form method="post" action="/backups/<?php echo (int) $backup['id']; ?>/delete" style="display: inline;" onsubmit="return confirm('Delete this backup?');">
+                                        <?php echo \CaddyPanel\Core\Csrf::input(); ?>
+                                        <button class="button" type="submit">Delete</button>
+                                    </form>
                                 <?php else: ?>
                                     <span class="muted">Pending</span>
                                 <?php endif; ?>

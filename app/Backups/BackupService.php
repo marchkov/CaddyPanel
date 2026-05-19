@@ -148,6 +148,28 @@ class BackupService
         ];
     }
 
+    public function delete(int $backupId, int $userId, string $ipAddress): void
+    {
+        $backup = $this->backups->find($backupId);
+
+        if (!$backup) {
+            throw new \InvalidArgumentException('Backup not found.');
+        }
+
+        if (in_array($backup['status'] ?? '', ['queued', 'running'], true)) {
+            throw new \InvalidArgumentException('Queued or running backups cannot be deleted.');
+        }
+
+        $file = (string) ($backup['backup_file'] ?? '');
+
+        if ($file !== '' && is_file($file) && !unlink($file)) {
+            throw new \RuntimeException('Unable to delete backup file.');
+        }
+
+        $this->backups->delete($backupId);
+        $this->audit($userId, 'backup_delete', $backupId, 'success', 'Deleted backup for ' . ($backup['domain'] ?? 'site') . '.', $ipAddress);
+    }
+
     private function processQueuedBackup(array $backup): array
     {
         $backupId = (int) $backup['id'];

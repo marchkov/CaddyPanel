@@ -148,7 +148,7 @@ create_directories() {
         "$APP_DIR/apps/filegator" \
         /etc/caddy/sites \
         /var/www/sites \
-        /var/backups/caddypanel \
+        /var/www/sites/backup \
         /var/log/caddypanel
 }
 

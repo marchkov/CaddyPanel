@@ -127,7 +127,7 @@ $backupService = new BackupService(
     new DatabaseRepository($database),
     new BackupProvisioner(
         new CommandRunner(dirname(__DIR__) . '/bin', $config['env'] ?? 'local'),
-        dirname(__DIR__) . '/var/backups',
+        $config['paths']['backups'],
         $config['env'] ?? 'local'
     ),
     $database
@@ -146,7 +146,7 @@ $restoreController = new RestoreController(
         new DatabaseRepository($database),
         new RestoreProvisioner(
             new CommandRunner(dirname(__DIR__) . '/bin', $config['env'] ?? 'local'),
-            dirname(__DIR__) . '/var/backups',
+            $config['paths']['backups'],
             $config['env'] ?? 'local'
         ),
         $database
@@ -237,6 +237,7 @@ $router->get('/logs/sites/{id}', [$logController, 'site']);
 $router->get('/backups', [$backupController, 'index']);
 $router->post('/backups/create', [$backupController, 'create']);
 $router->get('/backups/{id}/download', [$backupController, 'download']);
+$router->post('/backups/{id}/delete', [$backupController, 'delete']);
 $router->post('/backups/jobs/create', [$backupController, 'createJob']);
 $router->get('/restore', [$restoreController, 'index']);
 $router->get('/restore/{id}', [$restoreController, 'show']);

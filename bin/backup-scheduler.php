@@ -38,7 +38,7 @@ $backupService = new BackupService(
     new DatabaseRepository($database),
     new BackupProvisioner(
         new CommandRunner(dirname(__DIR__) . '/bin', $config['env'] ?? 'local'),
-        dirname(__DIR__) . '/var/backups',
+        $config['paths']['backups'],
         $config['env'] ?? 'local'
     ),
     $database

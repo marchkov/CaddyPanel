@@ -111,6 +111,11 @@ class BackupRepository
         );
     }
 
+    public function delete(int $id): void
+    {
+        $this->database->execute('DELETE FROM backup_runs WHERE id = ?', [$id]);
+    }
+
     private function ensureQueueColumns(): void
     {
         $columns = array_column($this->database->fetchAll('PRAGMA table_info(backup_runs)'), 'name');
