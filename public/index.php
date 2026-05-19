@@ -230,6 +230,7 @@ $router->post('/databases/{id}', [$databaseController, 'show']);
 $router->get('/databases/{id}/delete', [$databaseController, 'delete']);
 $router->post('/databases/{id}/delete', [$databaseController, 'delete']);
 $router->get('/db', [$appController, 'adminer']);
+$router->post('/db', [$appController, 'adminer']);
 $router->get('/files', [$appController, 'filegator']);
 $router->get('/logs', [$logController, 'index']);
 $router->get('/logs/sites/{id}', [$logController, 'site']);
