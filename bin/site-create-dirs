@@ -39,11 +39,24 @@ fi
 
 mkdir -p "$ROOT_PATH/public" "$ROOT_PATH/private" "$ROOT_PATH/logs" "$ROOT_PATH/tmp"
 
+CADDY_USER="caddy"
+if ! id -u "$CADDY_USER" >/dev/null 2>&1; then
+    CADDY_USER="www-data"
+fi
+
+chown www-data:www-data "$ROOT_PATH" "$ROOT_PATH/public" "$ROOT_PATH/private" "$ROOT_PATH/tmp"
+chmod 755 "$ROOT_PATH" "$ROOT_PATH/public" "$ROOT_PATH/private" "$ROOT_PATH/tmp"
+
+chown "$CADDY_USER:$CADDY_USER" "$ROOT_PATH/logs"
+chmod 750 "$ROOT_PATH/logs"
+
 if [[ "$TYPE" == "php" && ! -f "$ROOT_PATH/public/index.php" ]]; then
     cat > "$ROOT_PATH/public/index.php" <<'PHP'
 <?php
 echo 'Site is ready';
 PHP
+    chown www-data:www-data "$ROOT_PATH/public/index.php"
+    chmod 644 "$ROOT_PATH/public/index.php"
 fi
 
 if [[ "$TYPE" == "static" && ! -f "$ROOT_PATH/public/index.html" ]]; then
@@ -54,10 +67,8 @@ if [[ "$TYPE" == "static" && ! -f "$ROOT_PATH/public/index.html" ]]; then
 <body><h1>Site is ready</h1></body>
 </html>
 HTML
+    chown www-data:www-data "$ROOT_PATH/public/index.html"
+    chmod 644 "$ROOT_PATH/public/index.html"
 fi
-
-chown -R www-data:www-data "$ROOT_PATH"
-find "$ROOT_PATH" -type d -exec chmod 755 {} \;
-find "$ROOT_PATH" -type f -exec chmod 644 {} \;
 
 echo "created directories for $DOMAIN"
