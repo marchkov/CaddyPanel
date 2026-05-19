@@ -236,6 +236,37 @@ JSON
     cat > "$APP_DIR/apps/filegator/dist/caddypanel.php" <<'PHP'
 <?php
 
+$panelRoot = dirname(__DIR__, 3);
+
+require $panelRoot . '/vendor/autoload.php';
+
+$config = require $panelRoot . '/config/app.php';
+
+session_name($config['security']['session_name']);
+session_start([
+    'cookie_httponly' => true,
+    'cookie_samesite' => 'Lax',
+]);
+
+$user = $_SESSION['user'] ?? null;
+
+if (!$user || !in_array($user['role'] ?? null, ['admin', 'manager'], true)) {
+    header('Location: /login', true, 302);
+    exit;
+}
+
+$database = new CaddyPanel\Core\Database($config['database']['path']);
+$modules = new CaddyPanel\Modules\ModuleService(new CaddyPanel\Modules\ModuleRepository($database));
+
+if (!$modules->isEnabled('filegator')) {
+    http_response_code(403);
+    echo 'Module disabled';
+    exit;
+}
+
+session_write_close();
+session_name('filegator_session');
+
 define('APP_ENV', 'production');
 define('APP_PUBLIC_PATH', '/files/');
 
