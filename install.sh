@@ -149,8 +149,9 @@ copy_application() {
         --exclude "config/secret.key" \
         ./ "$APP_DIR/"
 
-    find "$APP_DIR/bin" -type f -exec chmod 755 {} \;
     chown -R www-data:www-data "$APP_DIR"
+    chown -R root:root "$APP_DIR/bin"
+    find "$APP_DIR/bin" -type f -exec chmod 755 {} \;
     chown root:www-data "$APP_DIR/config"
     chmod 750 "$APP_DIR/config"
 }
