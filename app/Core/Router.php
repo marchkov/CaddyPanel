@@ -25,7 +25,13 @@ class Router
         $method = $this->request->method();
         $path = $this->request->path();
 
-        foreach ($this->routes[$method] ?? [] as $route) {
+        $routes = $this->routes[$method] ?? [];
+
+        if ($method === 'HEAD' && $routes === []) {
+            $routes = $this->routes['GET'] ?? [];
+        }
+
+        foreach ($routes as $route) {
             $params = [];
 
             if ($this->matches($route['path'], $path, $params)) {

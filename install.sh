@@ -118,6 +118,12 @@ configure_log_directory() {
     chmod 750 /var/log/caddypanel
 }
 
+configure_caddy_php_access() {
+    if id -u caddy >/dev/null 2>&1 && getent group www-data >/dev/null 2>&1; then
+        usermod -aG www-data caddy
+    fi
+}
+
 copy_application() {
     rsync -a --delete \
         --exclude ".git" \
@@ -350,6 +356,7 @@ main() {
     detect_php_runtime
     create_directories
     configure_log_directory
+    configure_caddy_php_access
     copy_application
     install_integrated_apps
     initialize_panel
