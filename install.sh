@@ -54,6 +54,7 @@ install_packages() {
     apt-get update
     apt-get install -y \
         ca-certificates \
+        cron \
         curl \
         git \
         composer \
@@ -389,11 +390,22 @@ configure_sudoers() {
 }
 
 configure_cron() {
+    mkdir -p "$APP_DIR/var/logs"
+    chown -R www-data:www-data "$APP_DIR/var/logs"
+
     cat > /etc/cron.d/caddypanel <<EOF
-* * * * * www-data APP_ENV=production php $APP_DIR/bin/backup-scheduler.php >/dev/null 2>&1
-0 * * * * www-data APP_ENV=production php $APP_DIR/bin/update-cron.php >/dev/null 2>&1
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+* * * * * www-data cd $APP_DIR && APP_ENV=production /usr/bin/php $APP_DIR/bin/backup-scheduler.php >> $APP_DIR/var/logs/backup-scheduler.log 2>&1
+0 * * * * www-data cd $APP_DIR && APP_ENV=production /usr/bin/php $APP_DIR/bin/update-cron.php >> $APP_DIR/var/logs/update-cron.log 2>&1
 EOF
     chmod 644 /etc/cron.d/caddypanel
+
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl enable --now cron >/dev/null 2>&1 || true
+        systemctl restart cron >/dev/null 2>&1 || true
+    fi
 }
 
 configure_mariadb_service_user() {
