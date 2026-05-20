@@ -9,11 +9,28 @@ CaddyPanel is a minimal self-hosted VPS control panel for a trusted single-serve
 - Adminer
 - FileGator
 
-The current implementation is a fresh foundation based on `CaddyPanel_Project_Brief_v0.1.md`.
+The current implementation is an early alpha foundation based on `CaddyPanel_Project_Brief_v0.1.md`.
+
+## Alpha Notice
+
+CaddyPanel was originally built for personal use. It is shared in case it is useful to others, but it is not a polished commercial hosting panel and does not come with a security guarantee, support SLA, or warranty of any kind.
+
+Use it at your own risk, preferably on a fresh VPS that you can rebuild from backups. Review the code, firewall, DNS, Caddy, PHP-FPM, MariaDB, sudoers, and backup settings before trusting it with important data.
+
+Tested so far:
+
+- Ubuntu 24.04
+- Debian 13
+
+Planned, not yet supported:
+
+- AlmaLinux / Rocky / RHEL-like distributions
+- Fedora
+- Alpine Linux
 
 ## Quick Install
 
-Run on a fresh Ubuntu VPS as root:
+Run on a fresh Ubuntu or Debian VPS as root:
 
 ```bash
 wget -O install.sh https://raw.githubusercontent.com/marchkov/CaddyPanel/main/install.sh
@@ -199,13 +216,13 @@ Scheduled backup jobs respect their component flags: files, linked database, and
 
 ## Restore
 
-Restore foundation is available at:
+Restore is available as an action on successful backups from:
 
 ```text
-/restore
+/backups
 ```
 
-It inspects successful backup runs and can apply selected restore modes. Before applying a restore, CaddyPanel creates a pre-restore backup of the current site. File restore switches the site directory after preparing restored files in staging. Host config restore validates the full Caddyfile and reloads Caddy, rolling the config back if validation or reload fails.
+It can apply selected restore modes. Before applying a restore, CaddyPanel creates a pre-restore backup of the current site. File restore switches the site directory after preparing restored files in staging. Host config restore validates the full Caddyfile and reloads Caddy, rolling the config back if validation or reload fails.
 
 Database restore requires an active linked database record for the site and a SQL dump in the selected backup archive. The dump is restored into the currently linked database.
 
@@ -228,10 +245,11 @@ Helper scripts:
 ```text
 bin/update-check
 bin/update-apply
+bin/post-update
 bin/update-cron.php
 ```
 
-`update-check` fetches the configured Git repository and branch into `/opt/caddypanel/var/update-cache/repo`, then reports whether a newer revision is available. `update-apply` resets that cache to the selected branch and deploys panel code into `/opt/caddypanel` with `rsync`.
+`update-check` fetches the configured Git repository and branch into `/opt/caddypanel/var/update-cache/repo`, then reports whether a newer revision is available. `update-apply` resets that cache to the selected branch and deploys panel code into `/opt/caddypanel` with `rsync`. After deployment, `post-update` applies safe schema updates, refreshes sudoers/cron, fixes ownership, and records the installed commit in `settings.app_version`.
 
 The updater preserves production data:
 
