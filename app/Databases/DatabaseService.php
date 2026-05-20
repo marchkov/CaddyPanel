@@ -93,6 +93,34 @@ class DatabaseService
         return $this->encryptor->decrypt($database['password_encrypted']);
     }
 
+    public function attachToSite(int $id, int $siteId, int $userId, string $ipAddress): void
+    {
+        $database = $this->databases->find($id);
+
+        if (!$database || $database['deleted_at'] !== null) {
+            throw new \InvalidArgumentException('Database not found.');
+        }
+
+        if (!$this->siteExists($siteId)) {
+            throw new \InvalidArgumentException('Site not found.');
+        }
+
+        $this->databases->updateSite($id, $siteId);
+        $this->audit($userId, 'database_attach_site', $id, 'success', 'Attached database to site #' . $siteId . '.', $ipAddress);
+    }
+
+    public function detachFromSite(int $id, int $userId, string $ipAddress): void
+    {
+        $database = $this->databases->find($id);
+
+        if (!$database || $database['deleted_at'] !== null) {
+            throw new \InvalidArgumentException('Database not found.');
+        }
+
+        $this->databases->updateSite($id, null);
+        $this->audit($userId, 'database_detach_site', $id, 'success', 'Detached database from site.', $ipAddress);
+    }
+
     public function delete(int $id, int $userId, string $ipAddress): void
     {
         $database = $this->databases->find($id);
@@ -143,6 +171,14 @@ class DatabaseService
         }
 
         return $password;
+    }
+
+    private function siteExists(int $siteId): bool
+    {
+        return $this->database->fetch(
+            'SELECT id FROM sites WHERE id = ? AND deleted_at IS NULL',
+            [$siteId]
+        ) !== null;
     }
 
     private function audit(int $userId, string $action, ?int $databaseId, string $status, string $message, string $ipAddress): void

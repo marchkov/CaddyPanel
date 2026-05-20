@@ -37,8 +37,15 @@
                     <input id="domain_hint" name="domain_hint" placeholder="example.com" value="<?php echo htmlspecialchars($old['domain_hint'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
                 <div class="field">
-                    <label for="site_id">Site ID placeholder</label>
-                    <input id="site_id" name="site_id" placeholder="optional" value="<?php echo htmlspecialchars($old['site_id'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
+                    <label for="site_id">Site</label>
+                    <select id="site_id" name="site_id" style="width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 10px;">
+                        <option value="">No site</option>
+                        <?php foreach ($sites as $site): ?>
+                            <option value="<?php echo (int) $site['id']; ?>" <?php echo (string) ($old['site_id'] ?? '') === (string) $site['id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($site['domain'], ENT_QUOTES, 'UTF-8'); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <button class="button primary" type="submit">Create database</button>
             </form>

@@ -5,12 +5,14 @@ namespace CaddyPanel\Databases;
 use CaddyPanel\Core\Csrf;
 use CaddyPanel\Core\Request;
 use CaddyPanel\Core\Response;
+use CaddyPanel\Sites\SiteService;
 use CaddyPanel\Support\AuthGuard;
 
 class DatabaseController
 {
     public function __construct(
         private DatabaseService $databases,
+        private SiteService $sites,
         private AuthGuard $guard,
         private \Closure $viewData
     ) {
@@ -40,6 +42,7 @@ class DatabaseController
         Response::view('databases/create', ($this->viewData)([
             'error' => null,
             'old' => [],
+            'sites' => $this->sites->all(),
         ]));
     }
 
@@ -69,6 +72,7 @@ class DatabaseController
             if (!Csrf::validate($request->post('_csrf_token'))) {
                 Response::view('databases/show', ($this->viewData)([
                     'database' => $database,
+                    'sites' => $this->sites->all(),
                     'password' => null,
                     'error' => 'Invalid session token.',
                 ]));
@@ -76,11 +80,36 @@ class DatabaseController
 
             if ($request->post('action') === 'show_password') {
                 $password = $this->databases->revealPassword((int) $id, (int) $_SESSION['user']['id'], $request->ip());
+            } elseif ($request->post('action') === 'attach_site') {
+                try {
+                    $this->databases->attachToSite((int) $id, (int) $request->post('site_id'), (int) $_SESSION['user']['id'], $request->ip());
+                    Response::redirect('/databases/' . (int) $id);
+                } catch (\Throwable $exception) {
+                    Response::view('databases/show', ($this->viewData)([
+                        'database' => $database,
+                        'sites' => $this->sites->all(),
+                        'password' => null,
+                        'error' => $exception->getMessage(),
+                    ]));
+                }
+            } elseif ($request->post('action') === 'detach_site') {
+                try {
+                    $this->databases->detachFromSite((int) $id, (int) $_SESSION['user']['id'], $request->ip());
+                    Response::redirect('/databases/' . (int) $id);
+                } catch (\Throwable $exception) {
+                    Response::view('databases/show', ($this->viewData)([
+                        'database' => $database,
+                        'sites' => $this->sites->all(),
+                        'password' => null,
+                        'error' => $exception->getMessage(),
+                    ]));
+                }
             }
         }
 
         Response::view('databases/show', ($this->viewData)([
             'database' => $database,
+            'sites' => $this->sites->all(),
             'password' => $password,
             'error' => null,
         ]));
@@ -129,6 +158,7 @@ class DatabaseController
             Response::view('databases/create', ($this->viewData)([
                 'error' => 'Invalid session token.',
                 'old' => $_POST,
+                'sites' => $this->sites->all(),
             ]));
         }
 
@@ -143,6 +173,7 @@ class DatabaseController
             Response::view('databases/create', ($this->viewData)([
                 'error' => $exception->getMessage(),
                 'old' => $_POST,
+                'sites' => $this->sites->all(),
             ]));
         }
     }

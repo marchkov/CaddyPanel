@@ -47,6 +47,36 @@
                 <button class="button" type="submit">Show database password</button>
             </form>
         </section>
+
+        <section class="card" style="margin-top: 16px;">
+            <h2 style="margin-top: 0;">Site Link</h2>
+            <form method="post" action="/databases/<?php echo (int) $database['id']; ?>" style="display: grid; gap: 12px; max-width: 520px;">
+                <?php echo \CaddyPanel\Core\Csrf::input(); ?>
+                <input type="hidden" name="action" value="attach_site">
+                <div class="field" style="margin: 0;">
+                    <label for="site_id">Attach to site</label>
+                    <select id="site_id" name="site_id" style="width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 10px;">
+                        <?php foreach ($sites as $site): ?>
+                            <option value="<?php echo (int) $site['id']; ?>" <?php echo (int) ($database['site_id'] ?? 0) === (int) $site['id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($site['domain'], ENT_QUOTES, 'UTF-8'); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button class="button primary" type="submit">Save site link</button>
+                    <?php if (!empty($database['site_id'])): ?>
+                        <button
+                            class="button"
+                            type="submit"
+                            name="action"
+                            value="detach_site"
+                            onclick="return confirm('Detach this database from the site?');"
+                        >Detach</button>
+                    <?php endif; ?>
+                </div>
+            </form>
+        </section>
     </main>
 </div>
 <?php

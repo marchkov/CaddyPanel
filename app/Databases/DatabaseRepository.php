@@ -127,4 +127,12 @@ class DatabaseRepository
             [$status, $now, $now, $id]
         );
     }
+
+    public function updateSite(int $id, ?int $siteId): void
+    {
+        $this->database->execute(
+            'UPDATE databases SET site_id = ?, updated_at = ? WHERE id = ?',
+            [$siteId, date('Y-m-d H:i:s'), $id]
+        );
+    }
 }
