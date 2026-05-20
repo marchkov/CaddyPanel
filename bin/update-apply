@@ -61,14 +61,7 @@ rsync -a --delete \
     --exclude "var/update-cache/***" \
     ./ "$REPO_PATH/"
 
-find "$REPO_PATH/bin" -type f -exec chmod 755 {} \;
-chown -R www-data:www-data "$REPO_PATH"
-chown root:www-data "$REPO_PATH/config"
-chmod 750 "$REPO_PATH/config"
-
-if [[ -f "$REPO_PATH/config/secret.key" ]]; then
-    chown root:www-data "$REPO_PATH/config/secret.key"
-    chmod 640 "$REPO_PATH/config/secret.key"
-fi
+chmod 755 "$REPO_PATH/bin/post-update"
+"$REPO_PATH/bin/post-update" app_dir "$REPO_PATH" target_rev "$TARGET_REV"
 
 echo "updated panel code to $TARGET_REV"
