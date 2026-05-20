@@ -27,7 +27,6 @@ class DevBootstrap
             'adminer',
             'filegator',
             'backups',
-            'restore',
             'logs',
             'settings',
             'php_versions',

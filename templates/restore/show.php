@@ -18,7 +18,7 @@
                 <h1 style="margin: 0;">Restore Backup</h1>
                 <div class="muted"><?php echo htmlspecialchars($backup['domain'], ENT_QUOTES, 'UTF-8'); ?></div>
             </div>
-            <a class="button" href="/restore">Back</a>
+            <a class="button" href="/backups">Back</a>
         </div>
 
         <?php if (!empty($error)): ?>

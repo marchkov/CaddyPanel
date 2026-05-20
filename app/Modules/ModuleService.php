@@ -16,7 +16,6 @@ class ModuleService
             'adminer' => ['label' => 'Adminer', 'path' => '/db', 'admin_only' => false],
             'filegator' => ['label' => 'Files', 'path' => '/files', 'admin_only' => false],
             'backups' => ['label' => 'Backups', 'path' => '/backups', 'admin_only' => false],
-            'restore' => ['label' => 'Restore', 'path' => '/restore', 'admin_only' => false],
             'logs' => ['label' => 'Logs', 'path' => '/logs', 'admin_only' => false],
             'php_versions' => ['label' => 'PHP Versions', 'path' => '/php-versions', 'admin_only' => true],
             'settings' => ['label' => 'Settings', 'path' => '/settings', 'admin_only' => true],

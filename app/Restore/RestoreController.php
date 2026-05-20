@@ -18,17 +18,15 @@ class RestoreController
 
     public function index(): void
     {
-        $this->guard->requireModule('restore', ($this->viewData)());
+        $this->guard->requireModule('backups', ($this->viewData)());
         $this->guard->requireManagerOrAdmin();
 
-        Response::view('restore/index', ($this->viewData)([
-            'backups' => $this->restore->availableBackups(),
-        ]));
+        Response::redirect('/backups');
     }
 
     public function show(string $id): void
     {
-        $this->guard->requireModule('restore', ($this->viewData)());
+        $this->guard->requireModule('backups', ($this->viewData)());
         $this->guard->requireManagerOrAdmin();
 
         try {
@@ -49,7 +47,7 @@ class RestoreController
 
     public function apply(string $id): void
     {
-        $this->guard->requireModule('restore', ($this->viewData)());
+        $this->guard->requireModule('backups', ($this->viewData)());
         $this->guard->requireManagerOrAdmin();
 
         $request = new Request();
