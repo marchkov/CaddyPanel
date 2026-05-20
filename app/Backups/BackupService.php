@@ -170,6 +170,22 @@ class BackupService
         $this->audit($userId, 'backup_delete', $backupId, 'success', 'Deleted backup for ' . ($backup['domain'] ?? 'site') . '.', $ipAddress);
     }
 
+    public function retry(int $backupId, int $userId, string $ipAddress): void
+    {
+        $backup = $this->backups->find($backupId);
+
+        if (!$backup) {
+            throw new \InvalidArgumentException('Backup not found.');
+        }
+
+        if (($backup['status'] ?? '') !== 'failed') {
+            throw new \InvalidArgumentException('Only failed backups can be retried.');
+        }
+
+        $this->backups->retry($backupId);
+        $this->audit($userId, 'backup_retry', $backupId, 'success', 'Queued retry for ' . ($backup['domain'] ?? 'site') . '.', $ipAddress);
+    }
+
     private function processQueuedBackup(array $backup): array
     {
         $backupId = (int) $backup['id'];

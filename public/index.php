@@ -239,6 +239,7 @@ $router->get('/backups', [$backupController, 'index']);
 $router->post('/backups/create', [$backupController, 'create']);
 $router->get('/backups/{id}/download', [$backupController, 'download']);
 $router->post('/backups/{id}/delete', [$backupController, 'delete']);
+$router->post('/backups/{id}/retry', [$backupController, 'retry']);
 $router->post('/backups/jobs/create', [$backupController, 'createJob']);
 $router->get('/restore', [$restoreController, 'index']);
 $router->get('/restore/{id}', [$restoreController, 'show']);

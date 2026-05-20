@@ -114,6 +114,35 @@ class BackupController
         }
     }
 
+    public function retry(string $id): void
+    {
+        $this->guard->requireModule('backups', ($this->viewData)());
+        $this->guard->requireManagerOrAdmin();
+
+        $request = new Request();
+
+        if (!Csrf::validate($request->post('_csrf_token'))) {
+            Response::view('backups/index', ($this->viewData)([
+                'backups' => $this->backups->all(),
+                'jobs' => $this->jobs->all(),
+                'sites' => $this->sites->all(),
+                'error' => 'Invalid session token.',
+            ]));
+        }
+
+        try {
+            $this->backups->retry((int) $id, (int) $_SESSION['user']['id'], $request->ip());
+            Response::redirect('/backups');
+        } catch (\Throwable $exception) {
+            Response::view('backups/index', ($this->viewData)([
+                'backups' => $this->backups->all(),
+                'jobs' => $this->jobs->all(),
+                'sites' => $this->sites->all(),
+                'error' => $exception->getMessage(),
+            ]));
+        }
+    }
+
     public function createJob(): void
     {
         $this->guard->requireModule('backups', ($this->viewData)());

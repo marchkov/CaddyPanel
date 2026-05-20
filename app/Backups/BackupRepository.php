@@ -90,6 +90,16 @@ class BackupRepository
         );
     }
 
+    public function retry(int $id): void
+    {
+        $this->database->execute(
+            'UPDATE backup_runs
+             SET status = ?, backup_file = NULL, file_size = NULL, message = ?, started_at = ?, completed_at = NULL
+             WHERE id = ?',
+            ['queued', 'Backup is queued.', date('Y-m-d H:i:s'), $id]
+        );
+    }
+
     public function olderThanForSite(int $siteId, string $cutoff): array
     {
         return $this->database->fetchAll(

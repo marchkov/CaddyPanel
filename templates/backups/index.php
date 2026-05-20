@@ -159,8 +159,21 @@
                                             <button class="button" type="submit">Delete</button>
                                         </form>
                                     </div>
-                                <?php else: ?>
+                                <?php elseif ($backup['status'] === 'failed'): ?>
+                                    <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; white-space: nowrap;">
+                                        <form method="post" action="/backups/<?php echo (int) $backup['id']; ?>/retry" style="margin: 0;">
+                                            <?php echo \CaddyPanel\Core\Csrf::input(); ?>
+                                            <button class="button" type="submit">Retry</button>
+                                        </form>
+                                        <form method="post" action="/backups/<?php echo (int) $backup['id']; ?>/delete" style="margin: 0;" onsubmit="return confirm('Delete this backup record?');">
+                                            <?php echo \CaddyPanel\Core\Csrf::input(); ?>
+                                            <button class="button" type="submit">Delete</button>
+                                        </form>
+                                    </div>
+                                <?php elseif (in_array($backup['status'], ['queued', 'running'], true)): ?>
                                     <div style="text-align: right;"><span class="muted">Pending</span></div>
+                                <?php else: ?>
+                                    <div style="text-align: right;"><span class="muted">-</span></div>
                                 <?php endif; ?>
                             </td>
                         </tr>
