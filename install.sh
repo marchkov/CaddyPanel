@@ -178,11 +178,11 @@ copy_application() {
 
     rsync -a --delete \
         --exclude ".git" \
-        --exclude "apps/adminer/***" \
-        --exclude "apps/filegator/***" \
-        --exclude "var/data/*.sqlite" \
-        --exclude "var/generated/caddy/*.pending" \
+        --exclude "apps/***" \
+        --exclude "var/data/***" \
+        --exclude "var/generated/***" \
         --exclude "var/backups/*" \
+        --exclude "var/logs/***" \
         --exclude "var/update-cache/***" \
         --exclude "config/secret.key" \
         --exclude "config/mariadb-service.cnf" \
