@@ -64,7 +64,7 @@ else
 fi
 
 WORK_DIR="$(mktemp -d)"
-ARCHIVE="$BACKUP_DIR/$DOMAIN-$STAMP_$(printf '%02d' "$NEXT_NUMBER").tar.gz"
+ARCHIVE="$BACKUP_DIR/$DOMAIN-${STAMP}_$(printf '%02d' "$NEXT_NUMBER").tar.gz"
 
 cleanup() {
     rm -rf "$WORK_DIR"
