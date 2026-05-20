@@ -48,6 +48,7 @@ if [[ -n "$DATABASE_NAME" && ! "$DATABASE_NAME" =~ ^[a-z][a-z0-9_]{0,11}$ ]]; th
 fi
 
 mkdir -p "$BACKUP_DIR"
+chown www-data:www-data "$BACKUP_DIR"
 
 STAMP="$(date +%Y%m%d)"
 NEXT_NUMBER="$(
@@ -109,5 +110,7 @@ cat > "$WORK_DIR/manifest.json" <<JSON
 JSON
 
 tar -czf "$ARCHIVE" -C "$WORK_DIR" .
+chown www-data:www-data "$ARCHIVE"
+chmod 0644 "$ARCHIVE"
 
 echo "$ARCHIVE"
