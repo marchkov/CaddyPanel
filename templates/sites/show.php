@@ -113,7 +113,7 @@
                 <textarea
                     name="caddy_config"
                     rows="24"
-                    style="width: 100%; box-sizing: border-box; overflow: auto; white-space: pre; font-family: ui-monospace, SFMono-Regular, Consolas, Liberation Mono, monospace; font-size: 13px; line-height: 1.45; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 12px;"
+                    style="width: 100%; box-sizing: border-box; overflow: auto; white-space: pre; font-family: ui-monospace, SFMono-Regular, Consolas, Liberation Mono, monospace; font-size: 13px; line-height: 1.45; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 10px;"
                     spellcheck="false"
                 ><?php echo htmlspecialchars($site['caddy_config'] ?? '', ENT_QUOTES, 'UTF-8'); ?></textarea>
                 <label style="display: flex; gap: 8px; align-items: center; margin-top: 12px;">
