@@ -28,6 +28,10 @@
             </div>
         </div>
 
+        <?php if (!empty($error)): ?>
+            <div class="alert error"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
+        <?php endif; ?>
+
         <section class="grid">
             <div class="card">
                 <div class="muted">Type</div>
@@ -102,9 +106,24 @@
         <?php endif; ?>
 
         <section class="card" style="margin-top: 16px;">
-            <h2 style="margin-top: 0;">Caddy Config Preview</h2>
-            <p class="muted">Generated only. It is not applied to `/etc/caddy/sites` yet.</p>
-            <pre style="overflow: auto; white-space: pre; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px;"><?php echo htmlspecialchars($site['caddy_config_preview'] ?? '', ENT_QUOTES, 'UTF-8'); ?></pre>
+            <h2 style="margin-top: 0;">Caddy Config</h2>
+            <p class="muted">Current config from <?php echo htmlspecialchars($site['caddy_config_path'], ENT_QUOTES, 'UTF-8'); ?>. Saving validates and reloads Caddy.</p>
+            <form method="post" action="/sites/<?php echo (int) $site['id']; ?>/caddy-config" onsubmit="return confirm('Replace the active Caddy config for this site?');">
+                <input type="hidden" name="_csrf_token" value="<?php echo htmlspecialchars(\CaddyPanel\Core\Csrf::token(), ENT_QUOTES, 'UTF-8'); ?>">
+                <textarea
+                    name="caddy_config"
+                    rows="24"
+                    style="width: 100%; box-sizing: border-box; overflow: auto; white-space: pre; font-family: ui-monospace, SFMono-Regular, Consolas, Liberation Mono, monospace; font-size: 13px; line-height: 1.45; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px;"
+                    spellcheck="false"
+                ><?php echo htmlspecialchars($site['caddy_config'] ?? '', ENT_QUOTES, 'UTF-8'); ?></textarea>
+                <label style="display: flex; gap: 8px; align-items: center; margin-top: 12px;">
+                    <input type="checkbox" name="confirm_caddy_config" value="1">
+                    <span>I understand this will replace the active Caddy config for this site.</span>
+                </label>
+                <div style="margin-top: 12px;">
+                    <button type="submit">Save Caddy config</button>
+                </div>
+            </form>
         </section>
     </main>
 </div>

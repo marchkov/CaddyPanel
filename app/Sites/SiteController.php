@@ -108,6 +108,49 @@ class SiteController
         ]));
     }
 
+    public function caddyConfig(string $id): void
+    {
+        $this->guard->requireModule('sites', ($this->viewData)());
+        $this->guard->requireManagerOrAdmin();
+
+        $request = new Request();
+        $site = $this->sites->findWithAliases((int) $id);
+
+        if (!$site || $site['deleted_at'] !== null) {
+            Response::notFound();
+        }
+
+        if (!Csrf::validate($request->post('_csrf_token'))) {
+            Response::view('sites/show', ($this->viewData)([
+                'site' => $site,
+                'error' => 'Invalid session token.',
+            ]));
+        }
+
+        if (empty($_POST['confirm_caddy_config'])) {
+            Response::view('sites/show', ($this->viewData)([
+                'site' => $site,
+                'error' => 'Confirm that you want to replace the active Caddy config.',
+            ]));
+        }
+
+        try {
+            $this->sites->updateCaddyConfig(
+                (int) $id,
+                (string) $request->post('caddy_config', ''),
+                (int) $_SESSION['user']['id'],
+                $request->ip()
+            );
+            Response::redirect('/sites/' . (int) $id);
+        } catch (\Throwable $exception) {
+            $site['caddy_config'] = (string) $request->post('caddy_config', '');
+            Response::view('sites/show', ($this->viewData)([
+                'site' => $site,
+                'error' => $exception->getMessage(),
+            ]));
+        }
+    }
+
     private function handleCreate(Request $request): void
     {
         if (!Csrf::validate($request->post('_csrf_token'))) {

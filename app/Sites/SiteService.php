@@ -48,7 +48,7 @@ class SiteService
 
         $site['aliases'] = $this->sites->aliases($id);
         $site['databases'] = $this->databases->forSite($id);
-        $site['caddy_config_preview'] = $this->caddyRenderer->render($site, $site['aliases']);
+        $site['caddy_config'] = $this->currentCaddyConfig($site);
 
         return $site;
     }
@@ -210,8 +210,9 @@ class SiteService
 
         try {
             $message .= ' Directory provisioning: ' . $this->provisioner->createDirectories($siteData);
-            $previewPath = $this->caddyRenderer->writePreview($siteData, $aliases);
-            $message .= ' Caddy config preview: ' . $previewPath;
+            $config = $this->caddyRenderer->renderPreservingExisting($siteData, $aliases, $this->currentCaddyConfig($site));
+            $previewPath = $this->caddyRenderer->writeConfig($siteData, $config);
+            $message .= ' Caddy config: ' . $previewPath;
             $message .= ' Caddy apply: ' . $this->caddyApplier->applySiteConfig($site['domain'], $previewPath, $site['caddy_config_path']);
             $this->sites->updateStatus($siteId, 'active', null);
         } catch (\Throwable $exception) {
@@ -221,6 +222,34 @@ class SiteService
         }
 
         $this->audit($userId, 'site_update', $siteId, 'success', $message, $ipAddress);
+    }
+
+    public function updateCaddyConfig(int $siteId, string $config, int $userId, string $ipAddress): void
+    {
+        $site = $this->sites->find($siteId);
+
+        if (!$site || $site['deleted_at'] !== null) {
+            throw new \InvalidArgumentException('Site not found.');
+        }
+
+        $config = rtrim($config);
+
+        if ($config === '') {
+            throw new \InvalidArgumentException('Caddy config cannot be empty.');
+        }
+
+        try {
+            $pendingPath = $this->caddyRenderer->writeConfig($site, $config . "\n", '.manual.caddy.pending');
+            $message = 'Manual Caddy config update: ' . $pendingPath;
+            $message .= ' Caddy apply: ' . $this->caddyApplier->applySiteConfig($site['domain'], $pendingPath, $site['caddy_config_path']);
+            $this->sites->updateStatus($siteId, 'active', null);
+        } catch (\Throwable $exception) {
+            $this->sites->updateStatus($siteId, 'error', $exception->getMessage());
+            $this->audit($userId, 'site_caddy_config_update', $siteId, 'failed', $exception->getMessage(), $ipAddress);
+            throw $exception;
+        }
+
+        $this->audit($userId, 'site_caddy_config_update', $siteId, 'success', $message, $ipAddress);
     }
 
     public function delete(int $siteId, array $input, int $userId, string $ipAddress): void
@@ -328,6 +357,17 @@ class SiteService
         }
 
         return array_values(array_unique($aliases));
+    }
+
+    private function currentCaddyConfig(array $site): string
+    {
+        $path = (string) ($site['caddy_config_path'] ?? '');
+
+        if ($path !== '' && is_file($path) && is_readable($path)) {
+            return (string) file_get_contents($path);
+        }
+
+        return $this->caddyRenderer->render($site, $site['aliases'] ?? []);
     }
 
     private function audit(int $userId, string $action, int $siteId, string $status, string $message, string $ipAddress): void

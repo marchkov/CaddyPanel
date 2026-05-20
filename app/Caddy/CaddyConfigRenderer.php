@@ -13,6 +13,55 @@ class CaddyConfigRenderer
 
     public function render(array $site, array $aliases): string
     {
+        return $this->renderTemplate($site, $aliases);
+    }
+
+    public function renderPreservingExisting(array $site, array $aliases, ?string $existingConfig): string
+    {
+        if ($existingConfig === null || trim($existingConfig) === '') {
+            return $this->renderTemplate($site, $aliases);
+        }
+
+        $hosts = $this->hosts($site, $aliases);
+        $config = $existingConfig;
+
+        $config = preg_replace('/^([^{\n]+)\{\s*$/m', implode(', ', $hosts) . ' {', $config, 1) ?? $config;
+        $config = preg_replace('/^\s*root\s+\*\s+.+$/m', '    root * ' . $site['public_path'], $config, 1) ?? $config;
+
+        $phpLine = '    php_fastcgi unix/' . ($site['php_fpm_socket'] ?: ($this->defaults['php_fpm_socket'] ?? '/run/php/php8.4-fpm.sock'));
+
+        if ($site['type'] === 'php') {
+            if (preg_match('/^\s*php_fastcgi\s+.+$/m', $config)) {
+                $config = preg_replace('/^\s*php_fastcgi\s+.+$/m', $phpLine, $config, 1) ?? $config;
+            } elseif (preg_match('/^\s*file_server\s*$/m', $config)) {
+                $config = preg_replace('/^\s*file_server\s*$/m', $phpLine . "\n    file_server", $config, 1) ?? $config;
+            } else {
+                $config = preg_replace('/^\s*encode\s+.+$/m', "$0\n\n" . $phpLine, $config, 1) ?? $config;
+            }
+        } else {
+            $config = preg_replace('/^\s*php_fastcgi\s+.+\n?/m', '', $config) ?? $config;
+        }
+
+        $accessLog = rtrim($site['logs_path'], '/') . '/access.log';
+        $config = preg_replace('/^\s*output\s+file\s+.+$/m', '        output file ' . $accessLog . ' {', $config, 1) ?? $config;
+
+        return rtrim($config) . "\n";
+    }
+
+    public function writeConfig(array $site, string $config, string $suffix = '.caddy.pending'): string
+    {
+        if (!is_dir($this->generatedPath)) {
+            mkdir($this->generatedPath, 0775, true);
+        }
+
+        $path = rtrim($this->generatedPath, '/') . '/' . $site['domain'] . $suffix;
+        file_put_contents($path, $config);
+
+        return $path;
+    }
+
+    private function renderTemplate(array $site, array $aliases): string
+    {
         $templateFile = $site['type'] === 'php'
             ? $this->templatePath . '/site-php.caddy.tpl'
             : $this->templatePath . '/site-static.caddy.tpl';
@@ -21,10 +70,10 @@ class CaddyConfigRenderer
             throw new \RuntimeException('Caddy template not found: ' . $templateFile);
         }
 
-        $hosts = array_merge([$site['domain']], $this->normalizeAliases($aliases));
+        $hosts = $this->hosts($site, $aliases);
 
         $replacements = [
-            '{hosts}' => implode(', ', array_unique($hosts)),
+            '{hosts}' => implode(', ', $hosts),
             '{public_path}' => $site['public_path'],
             '{php_fpm_socket}' => $site['php_fpm_socket'] ?: ($this->defaults['php_fpm_socket'] ?? '/run/php/php8.4-fpm.sock'),
             '{access_log}' => rtrim($site['logs_path'], '/') . '/access.log',
@@ -38,15 +87,12 @@ class CaddyConfigRenderer
 
     public function writePreview(array $site, array $aliases): string
     {
-        if (!is_dir($this->generatedPath)) {
-            mkdir($this->generatedPath, 0775, true);
-        }
+        return $this->writeConfig($site, $this->render($site, $aliases));
+    }
 
-        $config = $this->render($site, $aliases);
-        $path = rtrim($this->generatedPath, '/') . '/' . $site['domain'] . '.caddy.pending';
-        file_put_contents($path, $config);
-
-        return $path;
+    private function hosts(array $site, array $aliases): array
+    {
+        return array_values(array_unique(array_merge([$site['domain']], $this->normalizeAliases($aliases))));
     }
 
     private function normalizeAliases(array $aliases): array
