@@ -143,6 +143,75 @@ class BackupController
         }
     }
 
+    public function editJob(string $id): void
+    {
+        $this->guard->requireModule('backups', ($this->viewData)());
+        $this->guard->requireManagerOrAdmin();
+
+        $request = new Request();
+        $job = $this->jobs->find((int) $id);
+
+        if (!$job) {
+            Response::notFound();
+        }
+
+        if ($request->method() === 'POST') {
+            if (!Csrf::validate($request->post('_csrf_token'))) {
+                Response::view('backups/job_edit', ($this->viewData)([
+                    'job' => array_merge($job, $_POST),
+                    'sites' => $this->sites->all(),
+                    'error' => 'Invalid session token.',
+                ]));
+            }
+
+            try {
+                $this->jobs->update((int) $id, $_POST, (int) $_SESSION['user']['id'], $request->ip());
+                Response::redirect('/backups');
+            } catch (\Throwable $exception) {
+                Response::view('backups/job_edit', ($this->viewData)([
+                    'job' => array_merge($job, $_POST),
+                    'sites' => $this->sites->all(),
+                    'error' => $exception->getMessage(),
+                ]));
+            }
+        }
+
+        Response::view('backups/job_edit', ($this->viewData)([
+            'job' => $job,
+            'sites' => $this->sites->all(),
+            'error' => null,
+        ]));
+    }
+
+    public function deleteJob(string $id): void
+    {
+        $this->guard->requireModule('backups', ($this->viewData)());
+        $this->guard->requireManagerOrAdmin();
+
+        $request = new Request();
+
+        if (!Csrf::validate($request->post('_csrf_token'))) {
+            Response::view('backups/index', ($this->viewData)([
+                'backups' => $this->backups->all(),
+                'jobs' => $this->jobs->all(),
+                'sites' => $this->sites->all(),
+                'error' => 'Invalid session token.',
+            ]));
+        }
+
+        try {
+            $this->jobs->delete((int) $id, (int) $_SESSION['user']['id'], $request->ip());
+            Response::redirect('/backups');
+        } catch (\Throwable $exception) {
+            Response::view('backups/index', ($this->viewData)([
+                'backups' => $this->backups->all(),
+                'jobs' => $this->jobs->all(),
+                'sites' => $this->sites->all(),
+                'error' => $exception->getMessage(),
+            ]));
+        }
+    }
+
     public function createJob(): void
     {
         $this->guard->requireModule('backups', ($this->viewData)());

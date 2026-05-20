@@ -21,6 +21,18 @@ class BackupJobRepository
         );
     }
 
+    public function find(int $id): ?array
+    {
+        return $this->database->fetch(
+            'SELECT j.*, s.domain
+             FROM backup_jobs j
+             INNER JOIN sites s ON s.id = j.site_id
+             WHERE j.id = ?
+             AND s.deleted_at IS NULL',
+            [$id]
+        );
+    }
+
     public function due(string $now): array
     {
         return $this->database->fetchAll(
@@ -61,6 +73,35 @@ class BackupJobRepository
         );
 
         return $this->database->lastInsertId();
+    }
+
+    public function update(int $id, array $data): void
+    {
+        $this->database->execute(
+            'UPDATE backup_jobs
+             SET site_id = ?, enabled = ?, schedule_type = ?, schedule_time = ?,
+                 include_files = ?, include_database = ?, include_caddy_config = ?,
+                 retention_days = ?, next_run_at = ?, updated_at = ?
+             WHERE id = ?',
+            [
+                $data['site_id'],
+                $data['enabled'],
+                $data['schedule_type'],
+                $data['schedule_time'],
+                $data['include_files'],
+                $data['include_database'],
+                $data['include_caddy_config'],
+                $data['retention_days'],
+                $data['next_run_at'],
+                date('Y-m-d H:i:s'),
+                $id,
+            ]
+        );
+    }
+
+    public function delete(int $id): void
+    {
+        $this->database->execute('DELETE FROM backup_jobs WHERE id = ?', [$id]);
     }
 
     public function updateRunState(int $id, string $lastRunAt, string $nextRunAt): void

@@ -95,10 +95,11 @@
                         <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border);">Site</th>
                         <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border);">Schedule</th>
                         <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border);">Next run</th>
-                        <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border);">Last run</th>
-                        <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border);">Includes</th>
-                        <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border);">Status</th>
-                    </tr>
+	                        <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border);">Last run</th>
+	                        <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border);">Includes</th>
+	                        <th style="text-align: left; padding: 12px; border-bottom: 1px solid var(--border);">Status</th>
+	                        <th style="text-align: right; padding: 12px; border-bottom: 1px solid var(--border);">Actions</th>
+	                    </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($jobs as $job): ?>
@@ -121,9 +122,18 @@
                                 }
                                 echo htmlspecialchars(implode(', ', $includes) ?: '-', ENT_QUOTES, 'UTF-8');
                                 ?>
-                            </td>
-                            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><?php echo (int) $job['enabled'] === 1 ? 'enabled' : 'disabled'; ?></td>
-                        </tr>
+	                            </td>
+	                            <td style="padding: 12px; border-bottom: 1px solid var(--border);"><?php echo (int) $job['enabled'] === 1 ? 'enabled' : 'disabled'; ?></td>
+	                            <td style="padding: 12px; border-bottom: 1px solid var(--border);">
+	                                <div style="display: flex; justify-content: flex-end; align-items: center; gap: 8px; white-space: nowrap;">
+	                                    <a class="button" href="/backups/jobs/<?php echo (int) $job['id']; ?>/edit">Edit</a>
+	                                    <form method="post" action="/backups/jobs/<?php echo (int) $job['id']; ?>/delete" style="margin: 0;" onsubmit="return confirm('Delete this scheduled backup?');">
+	                                        <?php echo \CaddyPanel\Core\Csrf::input(); ?>
+	                                        <button class="button" type="submit">Delete</button>
+	                                    </form>
+	                                </div>
+	                            </td>
+	                        </tr>
                     <?php endforeach; ?>
                 </tbody>
             </table>
