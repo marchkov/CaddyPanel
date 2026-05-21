@@ -106,6 +106,7 @@ The web app does not run as root. Production filesystem actions are routed throu
 bin/site-create-dirs
 bin/site-delete-files
 bin/admin-task
+bin/firewall-task
 ```
 
 In `APP_ENV=local`, these commands are skipped by `CommandRunner` and no `/var/www` paths are touched.
@@ -130,6 +131,18 @@ bin/caddy-reload
 ```
 
 In production, the apply helper validates, backs up the previous config, applies the pending config, validates the full Caddyfile, reloads Caddy, and rolls back on failure.
+
+## Firewall
+
+Admin-only UFW controls are available at:
+
+```text
+/firewall
+```
+
+The module can show UFW status, list numbered rules, allow or deny TCP/UDP ports, delete a numbered rule, and enable or disable UFW. Enabling UFW automatically allows `80/tcp` and `443/tcp` so the panel and hosted sites remain reachable.
+
+If you still need direct SSH access after enabling UFW, allow `22/tcp` first. Disabling the CaddyPanel module only hides the UI; it does not uninstall UFW or remove existing firewall rules.
 
 ## Database Helpers
 

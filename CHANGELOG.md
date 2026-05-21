@@ -12,11 +12,13 @@
 - Password confirmation before revealing stored database passwords.
 - Protection against deactivating the last active admin account.
 - Admin Tasks module with an allowlisted service table and log diagnostics.
+- Firewall module for simple admin-only UFW status and rule management.
 
 ### Changed
 
 - Existing installs receive new security settings during `post-update`.
 - Existing installs receive the Admin Tasks module and sudo helper during `post-update`.
+- Existing installs receive the Firewall module and sudo helper during `post-update`.
 - User management now documents password and active-admin requirements in the UI.
 
 ## v0.1.0-alpha.1 - 2026-05-20

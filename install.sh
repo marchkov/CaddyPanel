@@ -62,6 +62,7 @@ install_packages() {
         unzip \
         sqlite3 \
         mariadb-server \
+        ufw \
         caddy \
         php-cli \
         php-fpm \

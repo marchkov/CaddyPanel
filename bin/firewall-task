@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ACTION=""
+PORT=""
+PROTO="tcp"
+RULE=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        action) ACTION="${2:-}"; shift 2 ;;
+        port) PORT="${2:-}"; shift 2 ;;
+        proto) PROTO="${2:-}"; shift 2 ;;
+        rule) RULE="${2:-}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+require_ufw() {
+    if ! command -v ufw >/dev/null 2>&1; then
+        echo "UFW is not installed." >&2
+        exit 3
+    fi
+}
+
+validate_port() {
+    if [[ ! "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
+        echo "Invalid port." >&2
+        exit 2
+    fi
+}
+
+validate_proto() {
+    case "$PROTO" in
+        tcp|udp) ;;
+        *) echo "Invalid protocol." >&2; exit 2 ;;
+    esac
+}
+
+ensure_web_ports() {
+    ufw allow 80/tcp >/dev/null
+    ufw allow 443/tcp >/dev/null
+}
+
+require_ufw
+
+case "$ACTION" in
+    status)
+        ufw status verbose
+        ;;
+    rules)
+        ufw status numbered
+        ;;
+    allow)
+        validate_port
+        validate_proto
+        ufw allow "${PORT}/${PROTO}"
+        ;;
+    deny)
+        validate_port
+        validate_proto
+        ufw deny "${PORT}/${PROTO}"
+        ;;
+    delete)
+        if [[ ! "$RULE" =~ ^[0-9]+$ ]] || (( RULE < 1 || RULE > 999 )); then
+            echo "Invalid rule number." >&2
+            exit 2
+        fi
+
+        printf 'y\n' | ufw delete "$RULE"
+        ;;
+    enable)
+        ensure_web_ports
+        printf 'y\n' | ufw enable
+        ;;
+    disable)
+        printf 'y\n' | ufw disable
+        ;;
+    *)
+        echo "Unknown firewall action." >&2
+        exit 2
+        ;;
+esac

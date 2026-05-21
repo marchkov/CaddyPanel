@@ -26,6 +26,8 @@ use CaddyPanel\Core\SecurityHeaders;
 use CaddyPanel\Core\SessionGuard;
 use CaddyPanel\Logs\AuditLogRepository;
 use CaddyPanel\Logs\LogController;
+use CaddyPanel\Firewall\FirewallController;
+use CaddyPanel\Firewall\FirewallService;
 use CaddyPanel\Modules\ModuleRepository;
 use CaddyPanel\Modules\ModuleService;
 use CaddyPanel\PhpVersions\PhpVersionController;
@@ -221,6 +223,11 @@ $adminTasksController = new AdminTasksController(
     $guard,
     $viewData
 );
+$firewallController = new FirewallController(
+    new FirewallService(new CommandRunner(dirname(__DIR__) . '/bin', $env), $database),
+    $guard,
+    $viewData
+);
 
 $router->get('/health', function () use ($database, $request, $settings): void {
     $token = trim((string) $settings->get('health_check_token', ''));
@@ -305,6 +312,8 @@ $router->get('/php-versions', [$phpVersionController, 'index']);
 $router->post('/php-versions', [$phpVersionController, 'index']);
 $router->get('/admin-tasks', [$adminTasksController, 'index']);
 $router->post('/admin-tasks', [$adminTasksController, 'index']);
+$router->get('/firewall', [$firewallController, 'index']);
+$router->post('/firewall', [$firewallController, 'index']);
 $router->get('/users', [$userController, 'index']);
 $router->get('/users/create', [$userController, 'create']);
 $router->post('/users/create', [$userController, 'create']);

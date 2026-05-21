@@ -20,6 +20,7 @@ class CommandRunner
         'system-status',
         'php-fpm-detect',
         'admin-task',
+        'firewall-task',
     ];
 
     public function __construct(

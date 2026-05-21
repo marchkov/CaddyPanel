@@ -44,6 +44,7 @@ $modules = [
     'restore',
     'logs',
     'admin_tasks',
+    'firewall',
     'settings',
     'php_versions',
     'updates',
