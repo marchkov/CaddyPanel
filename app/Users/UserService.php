@@ -57,6 +57,10 @@ class UserService
             throw new \InvalidArgumentException('You cannot deactivate your own account.');
         }
 
+        if (!$active && $user['role'] === 'admin' && $this->users->activeAdminCount() <= 1) {
+            throw new \InvalidArgumentException('At least one active admin account is required.');
+        }
+
         $this->users->setActive($id, $active);
         $this->audit($actorId, $active ? 'user_activate' : 'user_deactivate', $id, 'success', $user['username'], $ipAddress);
     }

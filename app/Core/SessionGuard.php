@@ -14,11 +14,7 @@ class SessionGuard
         $lastActivity = (int) ($_SESSION['last_activity'] ?? $now);
 
         if ($lifetimeSeconds > 0 && ($now - $lastActivity) > $lifetimeSeconds) {
-            $_SESSION = [];
-
-            if (session_status() === PHP_SESSION_ACTIVE) {
-                session_destroy();
-            }
+            SessionManager::destroy();
 
             if ($path === '/auth/check') {
                 http_response_code(401);

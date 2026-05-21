@@ -25,6 +25,8 @@
             <div class="alert"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
         <?php endif; ?>
 
+        <p class="muted">At least one active admin account must remain. New passwords must be at least 8 characters.</p>
+
         <section class="card" style="padding: 0; overflow: hidden;">
             <table style="width: 100%; border-collapse: collapse;">
                 <thead>

@@ -3,6 +3,7 @@
 namespace CaddyPanel\Auth;
 
 use CaddyPanel\Core\Database;
+use CaddyPanel\Core\SessionManager;
 
 class AuthService
 {
@@ -80,11 +81,7 @@ class AuthService
             $this->audit((int) $userId, 'logout', 'auth', null, 'success', null, $ipAddress);
         }
 
-        $_SESSION = [];
-
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            session_destroy();
-        }
+        SessionManager::destroy();
     }
 
     private function audit(?int $userId, string $action, ?string $targetType, ?int $targetId, string $status, ?string $message, string $ipAddress): void

@@ -43,6 +43,7 @@
                 <div class="field">
                     <label for="password">Password</label>
                     <input id="password" name="password" type="password" required>
+                    <div class="muted">Minimum 8 characters.</div>
                 </div>
                 <button class="button primary" type="submit">Create user</button>
             </form>

@@ -38,6 +38,16 @@ class UserRepository
         return $this->database->lastInsertId();
     }
 
+    public function activeAdminCount(): int
+    {
+        $row = $this->database->fetch(
+            'SELECT COUNT(*) AS count FROM users WHERE role = ? AND is_active = 1',
+            ['admin']
+        );
+
+        return (int) ($row['count'] ?? 0);
+    }
+
     public function setActive(int $id, bool $active): void
     {
         $this->database->execute(
