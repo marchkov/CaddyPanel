@@ -120,6 +120,14 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS login_attempts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL,
+    ip_address TEXT NOT NULL,
+    success INTEGER NOT NULL DEFAULT 0,
+    attempted_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS php_versions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     version TEXT NOT NULL,
@@ -140,3 +148,4 @@ CREATE INDEX IF NOT EXISTS idx_backup_runs_started_at ON backup_runs(started_at)
 CREATE INDEX IF NOT EXISTS idx_backup_jobs_site_id ON backup_jobs(site_id);
 CREATE INDEX IF NOT EXISTS idx_backup_jobs_next_run_at ON backup_jobs(next_run_at);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_lookup ON login_attempts(username, ip_address, attempted_at);

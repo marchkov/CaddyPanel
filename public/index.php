@@ -11,6 +11,7 @@ use CaddyPanel\Backups\BackupService;
 use CaddyPanel\Caddy\CaddyConfigApplier;
 use CaddyPanel\Caddy\CaddyConfigRenderer;
 use CaddyPanel\Core\Database;
+use CaddyPanel\Core\ErrorHandler;
 use CaddyPanel\Databases\DatabaseController;
 use CaddyPanel\Databases\DatabaseProvisioner;
 use CaddyPanel\Databases\DatabaseRepository;
@@ -18,6 +19,7 @@ use CaddyPanel\Databases\DatabaseService;
 use CaddyPanel\Core\Request;
 use CaddyPanel\Core\Response;
 use CaddyPanel\Core\Router;
+use CaddyPanel\Core\SecurityHeaders;
 use CaddyPanel\Logs\AuditLogRepository;
 use CaddyPanel\Logs\LogController;
 use CaddyPanel\Modules\ModuleRepository;
@@ -47,19 +49,24 @@ use CaddyPanel\Users\UserRepository;
 use CaddyPanel\Users\UserService;
 
 $config = require dirname(__DIR__) . '/config/app.php';
+$env = $config['env'] ?? 'local';
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+ErrorHandler::register($config['paths']['logs'], $env === 'production');
+SecurityHeaders::send();
 
 session_name($config['security']['session_name']);
 session_start([
     'cookie_httponly' => true,
+    'cookie_secure' => $env === 'production',
     'cookie_samesite' => 'Lax',
 ]);
-
-require dirname(__DIR__) . '/vendor/autoload.php';
 
 $request = new Request();
 $database = new Database($config['database']['path']);
 
-if (($config['env'] ?? 'local') === 'local') {
+if ($env === 'local') {
     DevBootstrap::run($database, dirname(__DIR__) . '/database/schema.sql');
 }
 
@@ -69,9 +76,9 @@ $settings = new SettingRepository($database);
 $guard = new AuthGuard($auth, $modules);
 $router = new Router($request);
 $authController = new AuthController($auth);
-$secretKey = SecretKey::load($config['paths']['secret_key'], ($config['env'] ?? 'local') === 'local');
+$secretKey = SecretKey::load($config['paths']['secret_key'], $env === 'local');
 $siteProvisioner = new SiteProvisioner(
-    new CommandRunner(dirname(__DIR__) . '/bin', $config['env'] ?? 'local')
+    new CommandRunner(dirname(__DIR__) . '/bin', $env)
 );
 $caddyRenderer = new CaddyConfigRenderer(
     dirname(__DIR__) . '/caddy/templates',
@@ -84,20 +91,20 @@ $caddyRenderer = new CaddyConfigRenderer(
     ]
 );
 $caddyApplier = new CaddyConfigApplier(
-    new CommandRunner(dirname(__DIR__) . '/bin', $config['env'] ?? 'local')
+    new CommandRunner(dirname(__DIR__) . '/bin', $env)
 );
 $phpVersionRepository = new PhpVersionRepository($database);
 $phpVersions = new PhpVersionService(
     $phpVersionRepository,
     $settings,
-    new CommandRunner(dirname(__DIR__) . '/bin', $config['env'] ?? 'local'),
+    new CommandRunner(dirname(__DIR__) . '/bin', $env),
     $database,
-    $config['env'] ?? 'local'
+    $env
 );
 $databaseService = new DatabaseService(
     new DatabaseRepository($database),
     $database,
-    new DatabaseProvisioner(new CommandRunner(dirname(__DIR__) . '/bin', $config['env'] ?? 'local')),
+    new DatabaseProvisioner(new CommandRunner(dirname(__DIR__) . '/bin', $env)),
     new Encryptor($secretKey)
 );
 $siteController = new SiteController(
@@ -126,9 +133,9 @@ $backupService = new BackupService(
     new SiteRepository($database),
     new DatabaseRepository($database),
     new BackupProvisioner(
-        new CommandRunner(dirname(__DIR__) . '/bin', $config['env'] ?? 'local'),
+        new CommandRunner(dirname(__DIR__) . '/bin', $env),
         $config['paths']['backups'],
-        $config['env'] ?? 'local'
+        $env
     ),
     $database
 );
@@ -145,9 +152,9 @@ $restoreController = new RestoreController(
         $backupService,
         new DatabaseRepository($database),
         new RestoreProvisioner(
-            new CommandRunner(dirname(__DIR__) . '/bin', $config['env'] ?? 'local'),
+            new CommandRunner(dirname(__DIR__) . '/bin', $env),
             $config['paths']['backups'],
-            $config['env'] ?? 'local'
+            $env
         ),
         $database
     ),
@@ -176,7 +183,7 @@ $logController = new LogController(
 );
 $updateController = new UpdateController(
     new UpdateService(
-        new CommandRunner(dirname(__DIR__) . '/bin', $config['env'] ?? 'local'),
+        new CommandRunner(dirname(__DIR__) . '/bin', $env),
         $settings,
         $database,
         dirname(__DIR__)
@@ -190,9 +197,17 @@ $userController = new UserController(
     $viewData
 );
 $systemStatus = new SystemStatusService(
-    new CommandRunner(dirname(__DIR__) . '/bin', $config['env'] ?? 'local'),
-    $config['env'] ?? 'local'
+    new CommandRunner(dirname(__DIR__) . '/bin', $env),
+    $env
 );
+
+$router->get('/health', function () use ($database): void {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'ok' => $database->fetch('SELECT 1 AS ok') !== null,
+        'service' => 'caddypanel',
+    ], JSON_UNESCAPED_SLASHES);
+});
 
 $router->get('/', fn () => Response::redirect('/dashboard'));
 $router->get('/login', [$authController, 'login']);

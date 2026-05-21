@@ -3,14 +3,21 @@
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 use CaddyPanel\Core\Database;
+use CaddyPanel\Core\ErrorHandler;
+use CaddyPanel\Core\SecurityHeaders;
 use CaddyPanel\Modules\ModuleRepository;
 use CaddyPanel\Modules\ModuleService;
 
 $config = require dirname(__DIR__) . '/config/app.php';
+$env = $config['env'] ?? 'local';
+
+ErrorHandler::register($config['paths']['logs'], $env === 'production');
+SecurityHeaders::send();
 
 session_name($config['security']['session_name']);
 session_start([
     'cookie_httponly' => true,
+    'cookie_secure' => $env === 'production',
     'cookie_samesite' => 'Lax',
 ]);
 
