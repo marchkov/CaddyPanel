@@ -416,6 +416,7 @@ The panel includes basic hardening for a small private VPS:
 - security headers;
 - optional panel IP allowlist;
 - private `/health` endpoint.
+- panel password confirmation before revealing stored database passwords.
 
 Open `Settings -> Security` after installation. The IP allowlist accepts comma-separated IP addresses or CIDR ranges, for example:
 

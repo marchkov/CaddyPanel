@@ -177,6 +177,7 @@ $restoreController = new RestoreController(
 $databaseController = new DatabaseController(
     $databaseService,
     $siteService,
+    $auth,
     $guard,
     $viewData
 );

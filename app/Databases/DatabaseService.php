@@ -93,6 +93,11 @@ class DatabaseService
         return $this->encryptor->decrypt($database['password_encrypted']);
     }
 
+    public function auditPasswordRevealFailure(int $id, int $userId, string $ipAddress): void
+    {
+        $this->audit($userId, 'database_password_show', $id, 'failed', 'Current password confirmation failed.', $ipAddress);
+    }
+
     public function attachToSite(int $id, int $siteId, int $userId, string $ipAddress): void
     {
         $database = $this->databases->find($id);

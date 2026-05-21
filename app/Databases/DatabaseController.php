@@ -2,6 +2,7 @@
 
 namespace CaddyPanel\Databases;
 
+use CaddyPanel\Auth\AuthService;
 use CaddyPanel\Core\Csrf;
 use CaddyPanel\Core\Request;
 use CaddyPanel\Core\Response;
@@ -13,6 +14,7 @@ class DatabaseController
     public function __construct(
         private DatabaseService $databases,
         private SiteService $sites,
+        private AuthService $auth,
         private AuthGuard $guard,
         private \Closure $viewData
     ) {
@@ -75,10 +77,22 @@ class DatabaseController
                     'sites' => $this->sites->all(),
                     'password' => null,
                     'error' => 'Invalid session token.',
+                    'revealPasswordRequired' => false,
                 ]));
             }
 
             if ($request->post('action') === 'show_password') {
+                if (!$this->auth->verifyCurrentUserPassword((string) $request->post('current_password', ''))) {
+                    $this->databases->auditPasswordRevealFailure((int) $id, (int) $_SESSION['user']['id'], $request->ip());
+                    Response::view('databases/show', ($this->viewData)([
+                        'database' => $database,
+                        'sites' => $this->sites->all(),
+                        'password' => null,
+                        'error' => 'Current password confirmation failed.',
+                        'revealPasswordRequired' => true,
+                    ]));
+                }
+
                 $password = $this->databases->revealPassword((int) $id, (int) $_SESSION['user']['id'], $request->ip());
             } elseif ($request->post('action') === 'attach_site') {
                 try {
@@ -90,6 +104,7 @@ class DatabaseController
                         'sites' => $this->sites->all(),
                         'password' => null,
                         'error' => $exception->getMessage(),
+                        'revealPasswordRequired' => false,
                     ]));
                 }
             } elseif ($request->post('action') === 'detach_site') {
@@ -102,6 +117,7 @@ class DatabaseController
                         'sites' => $this->sites->all(),
                         'password' => null,
                         'error' => $exception->getMessage(),
+                        'revealPasswordRequired' => false,
                     ]));
                 }
             }
@@ -112,6 +128,7 @@ class DatabaseController
             'sites' => $this->sites->all(),
             'password' => $password,
             'error' => null,
+            'revealPasswordRequired' => false,
         ]));
     }
 

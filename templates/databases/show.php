@@ -41,9 +41,20 @@
             <p><span class="muted">Database:</span> <?php echo htmlspecialchars($database['name'], ENT_QUOTES, 'UTF-8'); ?></p>
             <p><span class="muted">Username:</span> <?php echo htmlspecialchars($database['username'], ENT_QUOTES, 'UTF-8'); ?></p>
             <p><span class="muted">Site:</span> <?php echo htmlspecialchars($database['site_domain'] ?? '-', ENT_QUOTES, 'UTF-8'); ?></p>
-            <form method="post" action="/databases/<?php echo (int) $database['id']; ?>">
+            <form method="post" action="/databases/<?php echo (int) $database['id']; ?>" style="display: grid; gap: 10px; max-width: 360px;">
                 <?php echo \CaddyPanel\Core\Csrf::input(); ?>
                 <input type="hidden" name="action" value="show_password">
+                <div class="field" style="margin: 0;">
+                    <label for="current_password">Panel password</label>
+                    <input
+                        id="current_password"
+                        name="current_password"
+                        type="password"
+                        autocomplete="current-password"
+                        required
+                        <?php echo !empty($revealPasswordRequired) ? 'autofocus' : ''; ?>
+                    >
+                </div>
                 <button class="button" type="submit">Show database password</button>
             </form>
         </section>

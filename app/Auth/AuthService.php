@@ -73,6 +73,22 @@ class AuthService
         return in_array($_SESSION['user']['role'] ?? null, ['admin', 'manager'], true);
     }
 
+    public function verifyCurrentUserPassword(string $password): bool
+    {
+        $userId = $_SESSION['user']['id'] ?? null;
+
+        if (!$userId) {
+            return false;
+        }
+
+        $user = $this->database->fetch(
+            'SELECT password_hash FROM users WHERE id = ? AND is_active = 1',
+            [(int) $userId]
+        );
+
+        return $user !== null && password_verify($password, $user['password_hash']);
+    }
+
     public function logout(string $ipAddress): void
     {
         $userId = $_SESSION['user']['id'] ?? null;
