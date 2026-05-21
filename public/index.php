@@ -12,6 +12,7 @@ use CaddyPanel\Caddy\CaddyConfigApplier;
 use CaddyPanel\Caddy\CaddyConfigRenderer;
 use CaddyPanel\Core\Database;
 use CaddyPanel\Core\ErrorHandler;
+use CaddyPanel\Core\IpAccess;
 use CaddyPanel\Databases\DatabaseController;
 use CaddyPanel\Databases\DatabaseProvisioner;
 use CaddyPanel\Databases\DatabaseRepository;
@@ -20,6 +21,7 @@ use CaddyPanel\Core\Request;
 use CaddyPanel\Core\Response;
 use CaddyPanel\Core\Router;
 use CaddyPanel\Core\SecurityHeaders;
+use CaddyPanel\Core\SessionGuard;
 use CaddyPanel\Logs\AuditLogRepository;
 use CaddyPanel\Logs\LogController;
 use CaddyPanel\Modules\ModuleRepository;
@@ -73,6 +75,17 @@ if ($env === 'local') {
 $auth = new AuthService($database);
 $modules = new ModuleService(new ModuleRepository($database));
 $settings = new SettingRepository($database);
+
+$ipAllowlist = $settings->get('security_ip_allowlist', '');
+
+if ($request->path() !== '/health' && !IpAccess::isAllowed($request->ip(), $ipAllowlist)) {
+    http_response_code(403);
+    echo 'Forbidden';
+    exit;
+}
+
+SessionGuard::enforce((int) $settings->get('session_lifetime', (string) $config['security']['session_lifetime']), $request->path());
+
 $guard = new AuthGuard($auth, $modules);
 $router = new Router($request);
 $authController = new AuthController($auth);
@@ -201,7 +214,22 @@ $systemStatus = new SystemStatusService(
     $env
 );
 
-$router->get('/health', function () use ($database): void {
+$router->get('/health', function () use ($database, $request, $settings): void {
+    $token = trim((string) $settings->get('health_check_token', ''));
+    $providedToken = (string) ($request->query('token') ?? ($_SERVER['HTTP_X_CADDYPANEL_HEALTH_TOKEN'] ?? ''));
+
+    if ($token === '' && !IpAccess::isLocal($request->ip())) {
+        http_response_code(403);
+        echo 'Forbidden';
+        return;
+    }
+
+    if ($token !== '' && !hash_equals($token, $providedToken)) {
+        http_response_code(403);
+        echo 'Forbidden';
+        return;
+    }
+
     header('Content-Type: application/json');
     echo json_encode([
         'ok' => $database->fetch('SELECT 1 AS ok') !== null,

@@ -4,6 +4,7 @@ namespace CaddyPanel\Settings;
 
 use CaddyPanel\Core\Csrf;
 use CaddyPanel\Core\Database;
+use CaddyPanel\Core\IpAccess;
 use CaddyPanel\Core\Request;
 use CaddyPanel\Core\Response;
 use CaddyPanel\Modules\ModuleService;
@@ -82,6 +83,9 @@ class SettingsController
             'default_php_version' => $this->settings->get('default_php_version', '8.4'),
             'default_php_fpm_socket' => $this->settings->get('default_php_fpm_socket', '/run/php/php8.4-fpm.sock'),
             'backup_retention_count' => $this->settings->get('backup_retention_count', '7'),
+            'session_lifetime' => $this->settings->get('session_lifetime', '3600'),
+            'security_ip_allowlist' => $this->settings->get('security_ip_allowlist', ''),
+            'health_check_token' => $this->settings->get('health_check_token', ''),
             'updates_auto_check' => $this->settings->get('updates_auto_check', '1'),
             'updates_branch' => $this->settings->get('updates_branch', 'main'),
         ];
@@ -95,6 +99,9 @@ class SettingsController
         $phpVersion = trim((string) $request->post('default_php_version', '8.4'));
         $phpSocket = trim((string) $request->post('default_php_fpm_socket', '/run/php/php8.4-fpm.sock'));
         $retentionCount = max(1, min(365, (int) $request->post('backup_retention_count', '7')));
+        $sessionLifetime = max(300, min(86400, (int) $request->post('session_lifetime', '3600')));
+        $ipAllowlist = trim((string) $request->post('security_ip_allowlist', ''));
+        $healthToken = trim((string) $request->post('health_check_token', ''));
         $updatesBranch = trim((string) $request->post('updates_branch', 'main'));
 
         if ($panelDomain !== 'localhost' && preg_match('/^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/', $panelDomain) !== 1) {
@@ -121,12 +128,27 @@ class SettingsController
             throw new \InvalidArgumentException('Invalid updates branch.');
         }
 
+        if (!IpAccess::validateAllowlist($ipAllowlist)) {
+            throw new \InvalidArgumentException('Invalid IP allowlist. Use IPs or CIDR ranges separated by commas.');
+        }
+
+        if ($ipAllowlist !== '' && !IpAccess::isAllowed($request->ip(), $ipAllowlist)) {
+            throw new \InvalidArgumentException('The IP allowlist does not include your current IP address.');
+        }
+
+        if ($healthToken !== '' && preg_match('/^[a-zA-Z0-9._~:-]{16,128}$/', $healthToken) !== 1) {
+            throw new \InvalidArgumentException('Health check token must be 16-128 safe characters.');
+        }
+
         $this->settings->set('panel_domain', $panelDomain);
         $this->settings->set('admin_email', $adminEmail);
         $this->settings->set('ui_theme', $theme);
         $this->settings->set('default_php_version', $phpVersion);
         $this->settings->set('default_php_fpm_socket', $phpSocket);
         $this->settings->set('backup_retention_count', (string) $retentionCount);
+        $this->settings->set('session_lifetime', (string) $sessionLifetime);
+        $this->settings->set('security_ip_allowlist', $ipAllowlist);
+        $this->settings->set('health_check_token', $healthToken);
         $this->settings->set('updates_auto_check', !empty($_POST['updates_auto_check']) ? '1' : '0');
         $this->settings->set('updates_branch', $updatesBranch);
     }
@@ -140,6 +162,9 @@ class SettingsController
             'default_php_version' => (string) $request->post('default_php_version', '8.4'),
             'default_php_fpm_socket' => (string) $request->post('default_php_fpm_socket', '/run/php/php8.4-fpm.sock'),
             'backup_retention_count' => (string) $request->post('backup_retention_count', '7'),
+            'session_lifetime' => (string) $request->post('session_lifetime', '3600'),
+            'security_ip_allowlist' => (string) $request->post('security_ip_allowlist', ''),
+            'health_check_token' => (string) $request->post('health_check_token', ''),
             'updates_auto_check' => !empty($_POST['updates_auto_check']) ? '1' : '0',
             'updates_branch' => (string) $request->post('updates_branch', 'main'),
         ];

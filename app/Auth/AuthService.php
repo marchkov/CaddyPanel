@@ -45,6 +45,7 @@ class AuthService
             'username' => $user['username'],
             'role' => $user['role'],
         ];
+        $_SESSION['last_activity'] = time();
 
         $this->audit((int) $user['id'], 'login', 'auth', null, 'success', null, $ipAddress);
 

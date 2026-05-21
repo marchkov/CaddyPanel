@@ -406,6 +406,37 @@ curl -I https://api.github.com/repos/filegator/filegator/releases/latest
 
 Do not delete `/opt/caddypanel/config/secret.key`. Without it, encrypted database passwords stored by the panel cannot be decrypted.
 
+## Security Settings
+
+The panel includes basic hardening for a small private VPS:
+
+- login rate limiting;
+- secure production session cookies;
+- idle session timeout;
+- security headers;
+- optional panel IP allowlist;
+- private `/health` endpoint.
+
+Open `Settings -> Security` after installation. The IP allowlist accepts comma-separated IP addresses or CIDR ranges, for example:
+
+```text
+203.0.113.10, 198.51.100.0/24
+```
+
+If the allowlist is empty, the login page is reachable from any IP. `/health` is localhost-only by default. To use external monitoring, set a health check token and call:
+
+CaddyPanel refuses to save a non-empty allowlist that does not include the current admin IP address.
+
+```text
+https://panel.example.com/health?token=your-token
+```
+
+or send:
+
+```text
+X-CaddyPanel-Health-Token: your-token
+```
+
 ## Uninstall
 
 To remove CaddyPanel from a VPS:

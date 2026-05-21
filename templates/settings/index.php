@@ -66,6 +66,23 @@
                     <input id="backup_retention_count" name="backup_retention_count" value="<?php echo htmlspecialchars($settings['backup_retention_count'], ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
 
+                <h2>Security</h2>
+                <div class="field">
+                    <label for="session_lifetime">Session timeout, seconds</label>
+                    <input id="session_lifetime" name="session_lifetime" value="<?php echo htmlspecialchars($settings['session_lifetime'], ENT_QUOTES, 'UTF-8'); ?>">
+                    <div class="muted">Allowed range: 300-86400.</div>
+                </div>
+                <div class="field">
+                    <label for="security_ip_allowlist">Panel IP allowlist</label>
+                    <textarea id="security_ip_allowlist" name="security_ip_allowlist" rows="3" style="width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 10px;"><?php echo htmlspecialchars($settings['security_ip_allowlist'], ENT_QUOTES, 'UTF-8'); ?></textarea>
+                    <div class="muted">Leave empty to allow any IP. Use comma-separated IPs or CIDR ranges.</div>
+                </div>
+                <div class="field">
+                    <label for="health_check_token">Health check token</label>
+                    <input id="health_check_token" name="health_check_token" value="<?php echo htmlspecialchars($settings['health_check_token'], ENT_QUOTES, 'UTF-8'); ?>">
+                    <div class="muted">When empty, /health is available only from localhost.</div>
+                </div>
+
                 <h2>Updates</h2>
                 <div class="field">
                     <label for="updates_branch">Updates branch</label>
