@@ -33,6 +33,14 @@
                 <h2 style="margin-top: 0;">Result</h2>
                 <p class="muted">Exit code: <?php echo (int) ($result['exit_code'] ?? 1); ?></p>
                 <pre style="white-space: pre-wrap; overflow: auto; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 10px;"><?php echo htmlspecialchars((string) ($result['output'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></pre>
+                <?php if (str_contains((string) ($result['output'] ?? ''), ' scheduled.')): ?>
+                    <p class="muted">This page will refresh shortly.</p>
+                    <script>
+                        setTimeout(function () {
+                            window.location.href = '/admin-tasks';
+                        }, 3000);
+                    </script>
+                <?php endif; ?>
             </section>
         <?php endif; ?>
 

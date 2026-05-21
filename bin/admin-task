@@ -70,6 +70,14 @@ first_php_fpm_service() {
         | head -n 1
 }
 
+schedule_systemctl() {
+    local operation="$1"
+    local service="$2"
+
+    nohup bash -c 'sleep 1; systemctl "$1" "$2"' _ "$operation" "$service" >/dev/null 2>&1 &
+    echo "$service $operation scheduled."
+}
+
 case "$ACTION" in
     service-control)
         case "$OPERATION" in
@@ -89,8 +97,7 @@ case "$ACTION" in
             exit 2
         fi
 
-        systemctl "$OPERATION" "$SERVICE"
-        echo "$SERVICE $OPERATION completed."
+        schedule_systemctl "$OPERATION" "$SERVICE"
         ;;
     caddy-validate)
         caddy validate --config /etc/caddy/Caddyfile
