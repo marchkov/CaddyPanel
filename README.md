@@ -290,7 +290,7 @@ Admin-only user management:
 /users
 ```
 
-Admins can create `admin` and `manager` accounts, deactivate/reactivate users, and reset passwords. Self-deactivation is blocked.
+Admins can create `admin` and `manager` accounts, deactivate/reactivate users, and reset passwords. Self-deactivation is blocked, and at least one active admin account must remain.
 
 ## PHP Versions
 
@@ -415,7 +415,7 @@ The panel includes basic hardening for a small private VPS:
 - idle session timeout;
 - security headers;
 - optional panel IP allowlist;
-- private `/health` endpoint.
+- private `/health` endpoint;
 - panel password confirmation before revealing stored database passwords.
 
 Open `Settings -> Security` after installation. The IP allowlist accepts comma-separated IP addresses or CIDR ranges, for example:
@@ -424,9 +424,9 @@ Open `Settings -> Security` after installation. The IP allowlist accepts comma-s
 203.0.113.10, 198.51.100.0/24
 ```
 
-If the allowlist is empty, the login page is reachable from any IP. `/health` is localhost-only by default. To use external monitoring, set a health check token and call:
-
 CaddyPanel refuses to save a non-empty allowlist that does not include the current admin IP address.
+
+If the allowlist is empty, the login page is reachable from any IP. `/health` is localhost-only by default. To use external monitoring, set a health check token and call:
 
 ```text
 https://panel.example.com/health?token=your-token

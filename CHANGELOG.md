@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Login rate limiting with audited rate-limit events.
+- Production security headers and secure session cookies.
+- Idle session timeout with browser session cookie cleanup.
+- Configurable panel IP allowlist.
+- Private `/health` endpoint with optional token for external monitoring.
+- Password confirmation before revealing stored database passwords.
+- Protection against deactivating the last active admin account.
+
+### Changed
+
+- Existing installs receive new security settings during `post-update`.
+- User management now documents password and active-admin requirements in the UI.
+
 ## v0.1.0-alpha.1 - 2026-05-20
 
 First public alpha release of CaddyPanel.
