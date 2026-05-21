@@ -17,6 +17,18 @@ CaddyPanel was originally built for personal use. It is shared in case it is use
 
 Use it at your own risk, preferably on a fresh VPS that you can rebuild from backups. Review the code, firewall, DNS, Caddy, PHP-FPM, MariaDB, sudoers, and backup settings before trusting it with important data.
 
+## Project Scope
+
+CaddyPanel is intentionally focused on a small VPS running the system web stack directly. It is not a Docker platform, Kubernetes manager, multi-node orchestrator, or enterprise hosting suite.
+
+The intended stack is:
+
+- system Caddy package
+- system PHP-FPM package
+- system MariaDB package
+- site files under `/var/www/sites`
+- Caddy site configs under `/etc/caddy/sites`
+
 Tested so far:
 
 - Ubuntu 24.04
