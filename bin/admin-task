@@ -5,6 +5,7 @@ set -euo pipefail
 ACTION=""
 TARGET=""
 SERVICE=""
+OPERATION=""
 LINES="120"
 
 while [[ $# -gt 0 ]]; do
@@ -12,6 +13,7 @@ while [[ $# -gt 0 ]]; do
         action) ACTION="${2:-}"; shift 2 ;;
         target) TARGET="${2:-}"; shift 2 ;;
         service) SERVICE="${2:-}"; shift 2 ;;
+        operation) OPERATION="${2:-}"; shift 2 ;;
         lines) LINES="${2:-}"; shift 2 ;;
         *) echo "Unknown argument: $1" >&2; exit 2 ;;
     esac
@@ -37,6 +39,29 @@ validate_service() {
     fi
 }
 
+normalize_service() {
+    local service="$1"
+
+    validate_service "$service"
+
+    case "$service" in
+        caddy|mariadb)
+            echo "$service"
+            ;;
+        php[0-9]*.[0-9]*-fpm)
+            if [[ ! "$service" =~ ^php[0-9]+\.[0-9]+-fpm$ ]]; then
+                echo "Only phpX.Y-fpm services are allowed." >&2
+                exit 2
+            fi
+            echo "$service"
+            ;;
+        *)
+            echo "Service is not allowed." >&2
+            exit 2
+            ;;
+    esac
+}
+
 first_php_fpm_service() {
     systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null \
         | awk '{print $1}' \
@@ -46,6 +71,27 @@ first_php_fpm_service() {
 }
 
 case "$ACTION" in
+    service-control)
+        case "$OPERATION" in
+            start|stop|restart|reload) ;;
+            *) echo "Operation is not allowed." >&2; exit 2 ;;
+        esac
+
+        if [[ -z "$SERVICE" ]]; then
+            echo "Service is required." >&2
+            exit 2
+        fi
+
+        SERVICE="$(normalize_service "$SERVICE")"
+
+        if [[ "$OPERATION" == "reload" && "$SERVICE" != "caddy" ]]; then
+            echo "Reload is only allowed for Caddy." >&2
+            exit 2
+        fi
+
+        systemctl "$OPERATION" "$SERVICE"
+        echo "$SERVICE $OPERATION completed."
+        ;;
     caddy-validate)
         caddy validate --config /etc/caddy/Caddyfile
         ;;

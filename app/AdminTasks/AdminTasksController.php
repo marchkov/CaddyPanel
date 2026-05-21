@@ -32,7 +32,14 @@ class AdminTasksController
                 try {
                     $mode = (string) $request->post('mode', '');
 
-                    if ($mode === 'action') {
+                    if ($mode === 'service') {
+                        $result = $this->tasks->controlService(
+                            (string) $request->post('service', ''),
+                            (string) $request->post('operation', ''),
+                            (int) $_SESSION['user']['id'],
+                            $request->ip()
+                        );
+                    } elseif ($mode === 'action') {
                         $result = $this->tasks->runAction(
                             (string) $request->post('action', ''),
                             (string) $request->post('service', ''),
@@ -57,6 +64,7 @@ class AdminTasksController
         }
 
         Response::view('admin-tasks/index', ($this->viewData)([
+            'services' => $this->tasks->services(),
             'actions' => $this->tasks->actions(),
             'logTargets' => $this->tasks->logTargets(),
             'result' => $result,

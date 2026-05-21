@@ -9,10 +9,6 @@ class AdminTasksService
 {
     private const ACTIONS = [
         'caddy-validate' => 'Validate Caddy config',
-        'caddy-reload' => 'Reload Caddy',
-        'php-fpm-restart' => 'Restart PHP-FPM',
-        'mariadb-restart' => 'Restart MariaDB',
-        'system-status' => 'System status',
     ];
 
     private const LOG_TARGETS = [
@@ -35,9 +31,74 @@ class AdminTasksService
         return self::ACTIONS;
     }
 
+    public function services(): array
+    {
+        $status = $this->systemStatus();
+        $services = [
+            [
+                'service' => 'caddy',
+                'label' => 'Caddy',
+                'status' => (string) ($status['caddy'] ?? 'unknown'),
+                'type' => 'caddy',
+            ],
+            [
+                'service' => 'mariadb',
+                'label' => 'MariaDB',
+                'status' => (string) ($status['mariadb'] ?? 'unknown'),
+                'type' => 'mariadb',
+            ],
+        ];
+
+        foreach (($status['php_fpm_services'] ?? []) as $phpFpm) {
+            if (!is_array($phpFpm) || empty($phpFpm['service'])) {
+                continue;
+            }
+
+            $services[] = [
+                'service' => (string) $phpFpm['service'],
+                'label' => strtoupper((string) $phpFpm['service']),
+                'status' => (string) ($phpFpm['status'] ?? 'unknown'),
+                'type' => 'php-fpm',
+            ];
+        }
+
+        if (count($services) === 2) {
+            $services[] = [
+                'service' => '',
+                'label' => 'PHP-FPM',
+                'status' => (string) ($status['php_fpm'] ?? 'unknown'),
+                'type' => 'php-fpm',
+            ];
+        }
+
+        return $services;
+    }
+
     public function logTargets(): array
     {
         return self::LOG_TARGETS;
+    }
+
+    public function controlService(string $service, string $operation, int $userId, string $ipAddress): array
+    {
+        $service = $this->assertService($service);
+
+        if (!in_array($operation, ['start', 'stop', 'restart', 'reload'], true)) {
+            throw new \InvalidArgumentException('Invalid service operation.');
+        }
+
+        if ($operation === 'reload' && $service !== 'caddy') {
+            throw new \InvalidArgumentException('Reload is only available for Caddy.');
+        }
+
+        $result = $this->commands->run('admin-task', [
+            'action' => 'service-control',
+            'service' => $service,
+            'operation' => $operation,
+        ]);
+        $this->audit($userId, 'admin_task_service_' . $operation, $result, $ipAddress, $service);
+
+        return $result;
     }
 
     public function runAction(string $action, ?string $service, int $userId, string $ipAddress): array
@@ -91,8 +152,51 @@ class AdminTasksService
         return $service;
     }
 
-    private function audit(int $userId, string $action, array $result, string $ipAddress): void
+    private function assertService(string $service): string
     {
+        $service = trim($service);
+
+        if (in_array($service, ['caddy', 'mariadb'], true)) {
+            return $service;
+        }
+
+        return $this->assertPhpFpmService($service);
+    }
+
+    private function systemStatus(): array
+    {
+        $result = $this->commands->run('system-status');
+
+        if ((int) ($result['exit_code'] ?? 1) !== 0) {
+            return [
+                'caddy' => 'unknown',
+                'mariadb' => 'unknown',
+                'php_fpm' => 'unknown',
+                'php_fpm_services' => [],
+            ];
+        }
+
+        $decoded = json_decode((string) ($result['output'] ?? ''), true);
+
+        if (!is_array($decoded)) {
+            return [
+                'caddy' => 'unknown',
+                'mariadb' => 'unknown',
+                'php_fpm' => 'unknown',
+                'php_fpm_services' => [],
+            ];
+        }
+
+        $decoded['php_fpm_services'] = is_array($decoded['php_fpm_services'] ?? null) ? $decoded['php_fpm_services'] : [];
+
+        return $decoded;
+    }
+
+    private function audit(int $userId, string $action, array $result, string $ipAddress, ?string $messagePrefix = null): void
+    {
+        $message = (string) ($result['output'] ?? '');
+        $message = $messagePrefix !== null ? $messagePrefix . ': ' . $message : $message;
+
         $this->database->execute(
             'INSERT INTO audit_logs (user_id, action, target_type, target_id, status, message, ip_address, created_at)
              VALUES (?, ?, ?, NULL, ?, ?, ?, ?)',
@@ -101,7 +205,7 @@ class AdminTasksService
                 $action,
                 'admin_tasks',
                 (int) ($result['exit_code'] ?? 1) === 0 ? 'success' : 'failed',
-                substr((string) ($result['output'] ?? ''), 0, 2000),
+                substr($message, 0, 2000),
                 $ipAddress,
                 date('Y-m-d H:i:s'),
             ]

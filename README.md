@@ -301,11 +301,10 @@ Admin-only server actions and diagnostics:
 /admin-tasks
 ```
 
-This module does not expose an interactive shell. It runs only allowlisted tasks through `bin/admin-task`:
+This module does not expose an interactive shell. It shows an allowlisted service table and runs only allowlisted tasks through `bin/admin-task`:
 
+- start, stop, or restart Caddy, MariaDB, and detected PHP-FPM services;
 - validate or reload Caddy;
-- restart one detected PHP-FPM service;
-- restart MariaDB;
 - read system status;
 - read recent Caddy, PHP-FPM, MariaDB, panel, backup, and update logs.
 

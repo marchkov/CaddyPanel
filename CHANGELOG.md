@@ -11,7 +11,7 @@
 - Private `/health` endpoint with optional token for external monitoring.
 - Password confirmation before revealing stored database passwords.
 - Protection against deactivating the last active admin account.
-- Admin Tasks module for allowlisted server actions and log diagnostics.
+- Admin Tasks module with an allowlisted service table and log diagnostics.
 
 ### Changed
 
