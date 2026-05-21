@@ -12,3 +12,4 @@ www-data ALL=(root) NOPASSWD: /opt/caddypanel/bin/update-check
 www-data ALL=(root) NOPASSWD: /opt/caddypanel/bin/update-apply
 www-data ALL=(root) NOPASSWD: /opt/caddypanel/bin/system-status
 www-data ALL=(root) NOPASSWD: /opt/caddypanel/bin/php-fpm-detect
+www-data ALL=(root) NOPASSWD: /opt/caddypanel/bin/admin-task

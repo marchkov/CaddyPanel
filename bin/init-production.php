@@ -43,6 +43,7 @@ $modules = [
     'backups',
     'restore',
     'logs',
+    'admin_tasks',
     'settings',
     'php_versions',
     'updates',

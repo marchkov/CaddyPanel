@@ -2,6 +2,8 @@
 
 use CaddyPanel\Auth\AuthController;
 use CaddyPanel\Auth\AuthService;
+use CaddyPanel\AdminTasks\AdminTasksController;
+use CaddyPanel\AdminTasks\AdminTasksService;
 use CaddyPanel\Apps\AppController;
 use CaddyPanel\Apps\AppLocator;
 use CaddyPanel\Backups\BackupController;
@@ -214,6 +216,11 @@ $systemStatus = new SystemStatusService(
     new CommandRunner(dirname(__DIR__) . '/bin', $env),
     $env
 );
+$adminTasksController = new AdminTasksController(
+    new AdminTasksService(new CommandRunner(dirname(__DIR__) . '/bin', $env), $database),
+    $guard,
+    $viewData
+);
 
 $router->get('/health', function () use ($database, $request, $settings): void {
     $token = trim((string) $settings->get('health_check_token', ''));
@@ -296,6 +303,8 @@ $router->get('/updates', [$updateController, 'index']);
 $router->post('/updates', [$updateController, 'action']);
 $router->get('/php-versions', [$phpVersionController, 'index']);
 $router->post('/php-versions', [$phpVersionController, 'index']);
+$router->get('/admin-tasks', [$adminTasksController, 'index']);
+$router->post('/admin-tasks', [$adminTasksController, 'index']);
 $router->get('/users', [$userController, 'index']);
 $router->get('/users/create', [$userController, 'create']);
 $router->post('/users/create', [$userController, 'create']);

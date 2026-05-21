@@ -19,6 +19,7 @@ class CommandRunner
         'update-apply',
         'system-status',
         'php-fpm-detect',
+        'admin-task',
     ];
 
     public function __construct(

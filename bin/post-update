@@ -74,6 +74,13 @@ VALUES
 SQL
 }
 
+ensure_default_modules() {
+    sqlite3 "$DB_PATH" <<'SQL'
+INSERT OR IGNORE INTO modules (name, enabled, config_json, created_at, updated_at)
+VALUES ('admin_tasks', 1, NULL, datetime('now'), datetime('now'));
+SQL
+}
+
 configure_sudoers() {
     if [[ -f "$APP_DIR/install/sudoers.tpl" ]]; then
         cp "$APP_DIR/install/sudoers.tpl" /etc/sudoers.d/caddypanel
@@ -130,6 +137,7 @@ SQL
 
 run_schema_updates
 ensure_default_settings
+ensure_default_modules
 configure_sudoers
 configure_cron
 fix_permissions

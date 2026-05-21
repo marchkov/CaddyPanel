@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ACTION=""
+TARGET=""
+SERVICE=""
+LINES="120"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        action) ACTION="${2:-}"; shift 2 ;;
+        target) TARGET="${2:-}"; shift 2 ;;
+        service) SERVICE="${2:-}"; shift 2 ;;
+        lines) LINES="${2:-}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ ! "$LINES" =~ ^[0-9]+$ ]]; then
+    echo "Invalid lines value" >&2
+    exit 2
+fi
+
+if (( LINES < 20 )); then
+    LINES=20
+elif (( LINES > 500 )); then
+    LINES=500
+fi
+
+validate_service() {
+    local service="$1"
+
+    if [[ ! "$service" =~ ^[a-zA-Z0-9_.@-]+$ ]]; then
+        echo "Invalid service name" >&2
+        exit 2
+    fi
+}
+
+first_php_fpm_service() {
+    systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null \
+        | awk '{print $1}' \
+        | sed 's/\.service$//' \
+        | sort -V \
+        | head -n 1
+}
+
+case "$ACTION" in
+    caddy-validate)
+        caddy validate --config /etc/caddy/Caddyfile
+        ;;
+    caddy-reload)
+        systemctl reload caddy
+        echo "Caddy reloaded."
+        ;;
+    php-fpm-restart)
+        if [[ -z "$SERVICE" ]]; then
+            SERVICE="$(first_php_fpm_service)"
+        fi
+
+        if [[ -z "$SERVICE" ]]; then
+            echo "No PHP-FPM service found." >&2
+            exit 1
+        fi
+
+        validate_service "$SERVICE"
+        if [[ ! "$SERVICE" =~ ^php[0-9]+\.[0-9]+-fpm$ ]]; then
+            echo "Only phpX.Y-fpm services are allowed." >&2
+            exit 2
+        fi
+
+        systemctl restart "$SERVICE"
+        echo "$SERVICE restarted."
+        ;;
+    mariadb-restart)
+        systemctl restart mariadb
+        echo "MariaDB restarted."
+        ;;
+    system-status)
+        /opt/caddypanel/bin/system-status
+        ;;
+    logs)
+        case "$TARGET" in
+            caddy)
+                journalctl -u caddy -n "$LINES" --no-pager
+                ;;
+            php-fpm)
+                if [[ -z "$SERVICE" ]]; then
+                    SERVICE="$(first_php_fpm_service)"
+                fi
+
+                if [[ -z "$SERVICE" ]]; then
+                    echo "No PHP-FPM service found." >&2
+                    exit 1
+                fi
+
+                validate_service "$SERVICE"
+                if [[ ! "$SERVICE" =~ ^php[0-9]+\.[0-9]+-fpm$ ]]; then
+                    echo "Only phpX.Y-fpm services are allowed." >&2
+                    exit 2
+                fi
+
+                journalctl -u "$SERVICE" -n "$LINES" --no-pager
+                ;;
+            mariadb)
+                journalctl -u mariadb -n "$LINES" --no-pager
+                ;;
+            panel-error)
+                tail -n "$LINES" /opt/caddypanel/var/logs/panel-error.log 2>/dev/null || true
+                ;;
+            backup-scheduler)
+                tail -n "$LINES" /opt/caddypanel/var/logs/backup-scheduler.log 2>/dev/null || true
+                ;;
+            update-cron)
+                tail -n "$LINES" /opt/caddypanel/var/logs/update-cron.log 2>/dev/null || true
+                ;;
+            *)
+                echo "Unknown log target." >&2
+                exit 2
+                ;;
+        esac
+        ;;
+    *)
+        echo "Unknown action." >&2
+        exit 2
+        ;;
+esac

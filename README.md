@@ -105,6 +105,7 @@ The web app does not run as root. Production filesystem actions are routed throu
 ```text
 bin/site-create-dirs
 bin/site-delete-files
+bin/admin-task
 ```
 
 In `APP_ENV=local`, these commands are skipped by `CommandRunner` and no `/var/www` paths are touched.
@@ -291,6 +292,24 @@ Admin-only user management:
 ```
 
 Admins can create `admin` and `manager` accounts, deactivate/reactivate users, and reset passwords. Self-deactivation is blocked, and at least one active admin account must remain.
+
+## Admin Tasks
+
+Admin-only server actions and diagnostics:
+
+```text
+/admin-tasks
+```
+
+This module does not expose an interactive shell. It runs only allowlisted tasks through `bin/admin-task`:
+
+- validate or reload Caddy;
+- restart one detected PHP-FPM service;
+- restart MariaDB;
+- read system status;
+- read recent Caddy, PHP-FPM, MariaDB, panel, backup, and update logs.
+
+Every task is written to the audit log.
 
 ## PHP Versions
 
