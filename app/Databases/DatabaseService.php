@@ -126,6 +126,68 @@ class DatabaseService
         $this->audit($userId, 'database_detach_site', $id, 'success', 'Detached database from site.', $ipAddress);
     }
 
+    public function health(int $id, int $userId, string $ipAddress): string
+    {
+        $database = $this->activeDatabase($id);
+
+        try {
+            $message = $this->provisioner->health($database['name']);
+        } catch (\Throwable $exception) {
+            $this->audit($userId, 'database_health', $id, 'failed', $exception->getMessage(), $ipAddress);
+            throw $exception;
+        }
+
+        $this->audit($userId, 'database_health', $id, 'success', $message, $ipAddress);
+
+        return $message;
+    }
+
+    public function backup(int $id, int $userId, string $ipAddress): string
+    {
+        $database = $this->activeDatabase($id);
+
+        try {
+            $file = $this->provisioner->backup($database['name']);
+        } catch (\Throwable $exception) {
+            $this->audit($userId, 'database_backup', $id, 'failed', $exception->getMessage(), $ipAddress);
+            throw $exception;
+        }
+
+        $this->audit($userId, 'database_backup', $id, 'success', 'Created database backup: ' . $file, $ipAddress);
+
+        return $file;
+    }
+
+    public function restore(int $id, array $uploadedFile, int $userId, string $ipAddress): string
+    {
+        $database = $this->activeDatabase($id);
+        $originalName = (string) ($uploadedFile['name'] ?? '');
+        $temporaryPath = (string) ($uploadedFile['tmp_name'] ?? '');
+        $error = (int) ($uploadedFile['error'] ?? UPLOAD_ERR_NO_FILE);
+
+        if ($error !== UPLOAD_ERR_OK || $temporaryPath === '' || !is_uploaded_file($temporaryPath)) {
+            throw new \InvalidArgumentException('Database restore archive upload failed.');
+        }
+
+        $this->assertRestoreFileName($originalName);
+        $targetPath = $this->provisioner->uploadPath($database['name'], $originalName);
+
+        if (!move_uploaded_file($temporaryPath, $targetPath)) {
+            throw new \RuntimeException('Unable to store uploaded restore archive.');
+        }
+
+        try {
+            $message = $this->provisioner->restore($database['name'], $targetPath);
+        } catch (\Throwable $exception) {
+            $this->audit($userId, 'database_restore', $id, 'failed', $exception->getMessage(), $ipAddress);
+            throw $exception;
+        }
+
+        $this->audit($userId, 'database_restore', $id, 'success', $message, $ipAddress);
+
+        return $message;
+    }
+
     public function delete(int $id, int $userId, string $ipAddress): void
     {
         $database = $this->databases->find($id);
@@ -143,6 +205,31 @@ class DatabaseService
 
         $this->databases->markDeleted($id);
         $this->audit($userId, 'database_delete', $id, 'success', $message, $ipAddress);
+    }
+
+    private function activeDatabase(int $id): array
+    {
+        $database = $this->databases->find($id);
+
+        if (!$database || $database['deleted_at'] !== null) {
+            throw new \InvalidArgumentException('Database not found.');
+        }
+
+        return $database;
+    }
+
+    private function assertRestoreFileName(string $fileName): void
+    {
+        $lowerName = strtolower($fileName);
+
+        if (
+            !str_ends_with($lowerName, '.tar.gz')
+            && !str_ends_with($lowerName, '.tgz')
+            && !str_ends_with($lowerName, '.sql')
+            && !str_ends_with($lowerName, '.sql.gz')
+        ) {
+            throw new \InvalidArgumentException('Restore file must be .tar.gz, .tgz, .sql, or .sql.gz.');
+        }
     }
 
     private function assertName(string $name): void

@@ -121,7 +121,12 @@ $phpVersions = new PhpVersionService(
 $databaseService = new DatabaseService(
     new DatabaseRepository($database),
     $database,
-    new DatabaseProvisioner(new CommandRunner(dirname(__DIR__) . '/bin', $env)),
+    new DatabaseProvisioner(
+        new CommandRunner(dirname(__DIR__) . '/bin', $env),
+        $config['paths']['backups'],
+        dirname(__DIR__) . '/var/backups',
+        $env
+    ),
     new Encryptor($secretKey)
 );
 $siteController = new SiteController(
@@ -287,6 +292,9 @@ $router->get('/databases/create', [$databaseController, 'create']);
 $router->post('/databases/create', [$databaseController, 'create']);
 $router->get('/databases/{id}', [$databaseController, 'show']);
 $router->post('/databases/{id}', [$databaseController, 'show']);
+$router->post('/databases/{id}/health', [$databaseController, 'health']);
+$router->post('/databases/{id}/backup', [$databaseController, 'backup']);
+$router->post('/databases/{id}/restore', [$databaseController, 'restore']);
 $router->get('/databases/{id}/delete', [$databaseController, 'delete']);
 $router->post('/databases/{id}/delete', [$databaseController, 'delete']);
 $router->get('/db', [$appController, 'adminer']);

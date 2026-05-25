@@ -25,8 +25,14 @@ class DatabaseController
         $this->guard->requireModule('databases', ($this->viewData)());
         $this->guard->requireManagerOrAdmin();
 
+        $message = $_SESSION['database_action_message'] ?? null;
+        $error = $_SESSION['database_action_error'] ?? null;
+        unset($_SESSION['database_action_message'], $_SESSION['database_action_error']);
+
         Response::view('databases/index', ($this->viewData)([
             'databases' => $this->databases->all(),
+            'message' => $message,
+            'error' => $error,
         ]));
     }
 
@@ -169,6 +175,74 @@ class DatabaseController
         ]));
     }
 
+    public function health(string $id): void
+    {
+        $this->guard->requireModule('databases', ($this->viewData)());
+        $this->guard->requireManagerOrAdmin();
+
+        $request = new Request();
+
+        if (!Csrf::validate($request->post('_csrf_token'))) {
+            $_SESSION['database_action_error'] = 'Invalid session token.';
+            Response::redirect('/databases');
+        }
+
+        try {
+            $_SESSION['database_action_message'] = $this->databases->health((int) $id, (int) $_SESSION['user']['id'], $request->ip());
+        } catch (\Throwable $exception) {
+            $_SESSION['database_action_error'] = $exception->getMessage();
+        }
+
+        Response::redirect('/databases');
+    }
+
+    public function backup(string $id): void
+    {
+        $this->guard->requireModule('databases', ($this->viewData)());
+        $this->guard->requireManagerOrAdmin();
+
+        $request = new Request();
+
+        if (!Csrf::validate($request->post('_csrf_token'))) {
+            $_SESSION['database_action_error'] = 'Invalid session token.';
+            Response::redirect('/databases');
+        }
+
+        try {
+            $file = $this->databases->backup((int) $id, (int) $_SESSION['user']['id'], $request->ip());
+            $this->download($file);
+        } catch (\Throwable $exception) {
+            $_SESSION['database_action_error'] = $exception->getMessage();
+            Response::redirect('/databases');
+        }
+    }
+
+    public function restore(string $id): void
+    {
+        $this->guard->requireModule('databases', ($this->viewData)());
+        $this->guard->requireManagerOrAdmin();
+
+        $request = new Request();
+
+        if (!Csrf::validate($request->post('_csrf_token'))) {
+            $_SESSION['database_action_error'] = 'Invalid session token.';
+            Response::redirect('/databases');
+        }
+
+        try {
+            $_SESSION['database_action_message'] = $this->databases->restore(
+                (int) $id,
+                $_FILES['restore_file'] ?? [],
+                (int) $_SESSION['user']['id'],
+                $request->ip()
+            );
+        } catch (\Throwable $exception) {
+            $_SESSION['database_action_error'] = $exception->getMessage();
+        }
+
+        Response::redirect('/databases');
+    }
+
     private function handleCreate(Request $request): void
     {
         if (!Csrf::validate($request->post('_csrf_token'))) {
@@ -193,5 +267,19 @@ class DatabaseController
                 'sites' => $this->sites->all(),
             ]));
         }
+    }
+
+    private function download(string $file): never
+    {
+        if (!is_file($file) || !is_readable($file)) {
+            throw new \RuntimeException('Backup file is not available.');
+        }
+
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . basename($file) . '"');
+        header('Content-Length: ' . filesize($file));
+        header('X-Content-Type-Options: nosniff');
+        readfile($file);
+        exit;
     }
 }

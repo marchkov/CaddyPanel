@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+NAME=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        name) NAME="${2:-}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ -z "$NAME" ]]; then
+    echo "Usage: db-health name <name>" >&2
+    exit 2
+fi
+
+if [[ ! "$NAME" =~ ^[a-z][a-z0-9_]{0,11}$ ]]; then
+    echo "Invalid database name" >&2
+    exit 2
+fi
+
+mysqlcheck --defaults-extra-file=/opt/caddypanel/config/mariadb-service.cnf --check --auto-repair "$NAME"
+mysqlcheck --defaults-extra-file=/opt/caddypanel/config/mariadb-service.cnf --optimize "$NAME"
+
+echo "database $NAME checked, repaired when possible, and optimized"

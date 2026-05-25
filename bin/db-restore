@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+NAME=""
+ARCHIVE_PATH=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        name) NAME="${2:-}"; shift 2 ;;
+        archive_path) ARCHIVE_PATH="${2:-}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ -z "$NAME" || -z "$ARCHIVE_PATH" ]]; then
+    echo "Usage: db-restore name <name> archive_path <path>" >&2
+    exit 2
+fi
+
+if [[ ! "$NAME" =~ ^[a-z][a-z0-9_]{0,11}$ ]]; then
+    echo "Invalid database name" >&2
+    exit 2
+fi
+
+case "$ARCHIVE_PATH" in
+    /var/www/sites/backup/databases/uploads/*|/opt/caddypanel/var/backups/databases/uploads/*) ;;
+    *) echo "Archive path is not allowed." >&2; exit 2 ;;
+esac
+
+if [[ ! -f "$ARCHIVE_PATH" ]]; then
+    echo "Archive not found: $ARCHIVE_PATH" >&2
+    exit 2
+fi
+
+WORK_DIR="$(mktemp -d)"
+
+cleanup() {
+    rm -rf "$WORK_DIR"
+}
+trap cleanup EXIT
+
+SQL_FILE=""
+
+case "$ARCHIVE_PATH" in
+    *.tar.gz|*.tgz)
+        while IFS= read -r entry; do
+            if [[ "$entry" = /* || "$entry" == *".."* ]]; then
+                echo "Unsafe archive entry: $entry" >&2
+                exit 2
+            fi
+        done < <(tar -tzf "$ARCHIVE_PATH")
+
+        tar --no-same-owner -xzf "$ARCHIVE_PATH" -C "$WORK_DIR"
+
+        if [[ -f "$WORK_DIR/$NAME.sql" ]]; then
+            SQL_FILE="$WORK_DIR/$NAME.sql"
+        else
+            SQL_FILE="$(find "$WORK_DIR" -maxdepth 2 -type f -name '*.sql' | head -n 1)"
+        fi
+        ;;
+    *.sql)
+        SQL_FILE="$ARCHIVE_PATH"
+        ;;
+    *.sql.gz)
+        gunzip -c "$ARCHIVE_PATH" > "$WORK_DIR/$NAME.sql"
+        SQL_FILE="$WORK_DIR/$NAME.sql"
+        ;;
+    *)
+        echo "Unsupported restore file type." >&2
+        exit 2
+        ;;
+esac
+
+if [[ -z "$SQL_FILE" || ! -f "$SQL_FILE" ]]; then
+    echo "No SQL dump found in restore file." >&2
+    exit 2
+fi
+
+mysql --defaults-extra-file=/opt/caddypanel/config/mariadb-service.cnf "$NAME" < "$SQL_FILE"
+
+echo "database $NAME restored from $(basename "$ARCHIVE_PATH")"

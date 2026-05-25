@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+NAME=""
+BACKUP_DIR=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        name) NAME="${2:-}"; shift 2 ;;
+        backup_dir) BACKUP_DIR="${2:-}"; shift 2 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ -z "$NAME" || -z "$BACKUP_DIR" ]]; then
+    echo "Usage: db-backup name <name> backup_dir <path>" >&2
+    exit 2
+fi
+
+if [[ ! "$NAME" =~ ^[a-z][a-z0-9_]{0,11}$ ]]; then
+    echo "Invalid database name" >&2
+    exit 2
+fi
+
+EXPECTED_DIR="/var/www/sites/backup/databases"
+
+if [[ "$BACKUP_DIR" != "$EXPECTED_DIR" && "$BACKUP_DIR" != /opt/caddypanel/var/backups/databases ]]; then
+    echo "Backup dir is not allowed." >&2
+    exit 2
+fi
+
+mkdir -p "$BACKUP_DIR"
+chown www-data:www-data "$BACKUP_DIR"
+
+STAMP="$(date +%Y%m%d%H%M%S)"
+WORK_DIR="$(mktemp -d)"
+ARCHIVE="$BACKUP_DIR/$NAME-$STAMP.tar.gz"
+
+cleanup() {
+    rm -rf "$WORK_DIR"
+}
+trap cleanup EXIT
+
+mysqldump --defaults-extra-file=/opt/caddypanel/config/mariadb-service.cnf \
+    --single-transaction \
+    --routines \
+    --triggers \
+    "$NAME" > "$WORK_DIR/$NAME.sql"
+
+cat > "$WORK_DIR/manifest.json" <<JSON
+{
+  "type": "caddypanel-database-backup",
+  "database": "$NAME",
+  "created_at": "$(date -Iseconds)"
+}
+JSON
+
+tar -czf "$ARCHIVE" -C "$WORK_DIR" "$NAME.sql" manifest.json
+chown www-data:www-data "$ARCHIVE"
+chmod 0640 "$ARCHIVE"
+
+echo "$ARCHIVE"
