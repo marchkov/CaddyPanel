@@ -52,6 +52,8 @@ class DevBootstrap
             'ui_theme' => 'dark',
             'default_php_version' => '8.4',
             'default_php_fpm_socket' => '/run/php/php8.4-fpm.sock',
+            'panel_php_version' => '8.4',
+            'panel_php_fpm_socket' => '/run/php/php8.4-fpm.sock',
             'backup_retention_days' => '14',
             'backup_retention_count' => '7',
             'updates_auto_check' => '1',

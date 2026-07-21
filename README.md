@@ -337,7 +337,19 @@ CaddyPanel detects installed sockets with:
 bin/php-fpm-detect
 ```
 
-The panel stores detected versions in SQLite, lets an admin choose the default PHP-FPM socket, and uses detected versions in the site creation form. It does not install PHP versions from the web UI.
+It also checks PHP-FPM versions available from the server's configured APT repositories with:
+
+```text
+bin/php-fpm-available
+```
+
+The panel stores detected versions in SQLite, lets an admin choose the default PHP-FPM socket, shows how many active sites are pinned to each PHP version, and uses detected versions in the site creation form. It does not add third-party repositories or install PHP versions from the web UI.
+
+To reduce the chance that a distribution upgrade removes the PHP branch used by CaddyPanel, the installer marks the detected versioned PHP packages as manually installed with:
+
+```text
+bin/php-fpm-mark-manual
+```
 
 ## Installer
 
@@ -419,7 +431,7 @@ sudo -u www-data php /opt/caddypanel/bin/backup-scheduler.php
 sudo -u www-data php /opt/caddypanel/bin/update-cron.php
 ```
 
-The installer uses generic PHP packages such as `php-cli`, `php-fpm`, `php-sqlite3`, and `php-mysql`. It then detects the installed PHP-FPM service, for example `php8.3-fpm`, and writes the matching socket into CaddyPanel settings.
+The installer uses generic PHP packages such as `php-cli`, `php-fpm`, `php-sqlite3`, and `php-mysql`. It then detects the installed PHP-FPM service, for example `php8.3-fpm`, writes the matching socket into CaddyPanel settings, and marks the matching versioned PHP packages as manually installed so `apt autoremove` does not remove that branch unexpectedly.
 
 If Caddy validation fails, inspect:
 

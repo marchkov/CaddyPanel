@@ -139,6 +139,12 @@ max_input_time = 300'
     done
 }
 
+mark_php_runtime_manual() {
+    if [[ -x "$APP_DIR/bin/php-fpm-mark-manual" ]]; then
+        "$APP_DIR/bin/php-fpm-mark-manual" "$PHP_VERSION" || true
+    fi
+}
+
 create_directories() {
     mkdir -p "$APP_DIR" \
         "$APP_DIR/config" \
@@ -465,6 +471,7 @@ main() {
     configure_log_directory
     configure_caddy_php_access
     copy_application
+    mark_php_runtime_manual
     install_integrated_apps
     initialize_panel
     configure_caddy

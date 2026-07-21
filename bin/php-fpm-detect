@@ -3,19 +3,62 @@
 set -euo pipefail
 
 first=1
-printf '['
+manual_packages="$(apt-mark showmanual 2>/dev/null || true)"
+versions=""
+
+if command -v systemctl >/dev/null 2>&1; then
+    while IFS= read -r service; do
+        service="${service%.service}"
+
+        if [[ "$service" =~ ^php([0-9]+\.[0-9]+)-fpm$ ]]; then
+            versions="${versions}${BASH_REMATCH[1]}"$'\n'
+        fi
+    done < <(systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print $1}')
+fi
 
 for socket in /run/php/php*-fpm.sock; do
-    if [ ! -S "$socket" ] && [ ! -e "$socket" ]; then
-        continue
-    fi
-
     base="$(basename "$socket")"
     version="${base#php}"
     version="${version%-fpm.sock}"
 
+    if [[ "$version" =~ ^[0-9]+\.[0-9]+$ ]]; then
+        versions="${versions}${version}"$'\n'
+    fi
+done
+
+printf '['
+
+while IFS= read -r version; do
     if [[ ! "$version" =~ ^[0-9]+\.[0-9]+$ ]]; then
         continue
+    fi
+
+    socket="/run/php/php${version}-fpm.sock"
+    service="php${version}-fpm"
+    package="php${version}-fpm"
+    installed=0
+    manual=0
+    socket_exists=false
+    service_status="unknown"
+
+    if [ -S "$socket" ] || [ -e "$socket" ]; then
+        socket_exists=true
+    fi
+
+    if dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed'; then
+        installed=1
+    fi
+
+    if printf '%s\n' "$manual_packages" | grep -qx "$package"; then
+        manual=1
+    fi
+
+    if command -v systemctl >/dev/null 2>&1; then
+        if systemctl is-active --quiet "$service" 2>/dev/null; then
+            service_status="active"
+        elif systemctl list-unit-files "${service}.service" --no-legend 2>/dev/null | grep -q "${service}.service"; then
+            service_status="$(systemctl is-active "$service" 2>/dev/null || true)"
+        fi
     fi
 
     if [ "$first" -eq 0 ]; then
@@ -23,7 +66,8 @@ for socket in /run/php/php*-fpm.sock; do
     fi
 
     first=0
-    printf '{"version":"%s","fpm_socket":"%s","is_default":0}' "$version" "$socket"
-done
+    printf '{"version":"%s","fpm_socket":"%s","is_default":0,"package":"%s","installed":%s,"manual":%s,"service":"%s","service_status":"%s","socket_exists":%s}' \
+        "$version" "$socket" "$package" "$installed" "$manual" "$service" "$service_status" "$socket_exists"
+done < <(printf '%s' "$versions" | sort -Vu)
 
 printf ']\n'

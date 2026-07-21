@@ -22,6 +22,8 @@ class CommandRunner
         'update-apply',
         'system-status',
         'php-fpm-detect',
+        'php-fpm-available',
+        'php-fpm-mark-manual',
         'admin-task',
         'firewall-task',
     ];

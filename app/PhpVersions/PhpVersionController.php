@@ -29,7 +29,7 @@ class PhpVersionController
         }
 
         Response::view('php-versions/index', ($this->viewData)([
-            'versions' => $this->versions->all(),
+            'overview' => $this->versions->overview(),
             'error' => $error,
         ]));
     }
@@ -50,6 +50,11 @@ class PhpVersionController
 
             if ($action === 'set_default') {
                 $this->versions->setDefault((string) $request->post('version', ''), (int) $_SESSION['user']['id'], $request->ip());
+                Response::redirect('/php-versions');
+            }
+
+            if ($action === 'mark_manual') {
+                $this->versions->markManual((string) $request->post('version', ''), (int) $_SESSION['user']['id'], $request->ip());
                 Response::redirect('/php-versions');
             }
 
