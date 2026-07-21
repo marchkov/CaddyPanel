@@ -71,6 +71,14 @@ VALUES
     ('session_lifetime', '3600', datetime('now'), datetime('now')),
     ('security_ip_allowlist', '', datetime('now'), datetime('now')),
     ('health_check_token', '', datetime('now'), datetime('now'));
+
+INSERT INTO settings (key, value, created_at, updated_at)
+SELECT 'panel_php_version', COALESCE((SELECT value FROM settings WHERE key = 'default_php_version'), '8.4'), datetime('now'), datetime('now')
+WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key = 'panel_php_version');
+
+INSERT INTO settings (key, value, created_at, updated_at)
+SELECT 'panel_php_fpm_socket', COALESCE((SELECT value FROM settings WHERE key = 'default_php_fpm_socket'), '/run/php/php8.4-fpm.sock'), datetime('now'), datetime('now')
+WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key = 'panel_php_fpm_socket');
 SQL
 }
 
@@ -188,6 +196,54 @@ EOF
     systemctl daemon-reload >/dev/null 2>&1 || true
 }
 
+render_panel_caddy_config() {
+    local domain socket template tmp
+
+    template="$APP_DIR/caddy/templates/panel.caddy.tpl"
+
+    if [[ ! -f "$template" ]]; then
+        echo "warning: panel Caddy template missing: $template" >&2
+        return 0
+    fi
+
+    domain="$(sqlite3 "$DB_PATH" "SELECT value FROM settings WHERE key='panel_domain' LIMIT 1;" 2>/dev/null || true)"
+    socket="$(sqlite3 "$DB_PATH" "SELECT value FROM settings WHERE key='panel_php_fpm_socket' LIMIT 1;" 2>/dev/null || true)"
+
+    if [[ -z "$domain" ]]; then
+        domain="localhost"
+    fi
+
+    if [[ -z "$socket" ]]; then
+        socket="$(sqlite3 "$DB_PATH" "SELECT value FROM settings WHERE key='default_php_fpm_socket' LIMIT 1;" 2>/dev/null || true)"
+    fi
+
+    if [[ -z "$socket" ]]; then
+        socket="/run/php/php8.4-fpm.sock"
+    fi
+
+    if ! mkdir -p /etc/caddy/sites; then
+        echo "warning: unable to create /etc/caddy/sites" >&2
+        return 0
+    fi
+
+    tmp="$(mktemp)"
+    awk -v domain="$domain" -v socket="$socket" '{
+        gsub(/\{panel_domain\}/, domain)
+        gsub(/\{panel_php_fpm_socket\}/, socket)
+        print
+    }' "$template" > "$tmp"
+
+    if [[ -f /etc/caddy/sites/caddypanel.caddy ]]; then
+        cp /etc/caddy/sites/caddypanel.caddy "/etc/caddy/sites/caddypanel.caddy.bak.$(date +%Y%m%d%H%M%S)" || true
+    fi
+
+    if ! cp "$tmp" /etc/caddy/sites/caddypanel.caddy; then
+        echo "warning: unable to update /etc/caddy/sites/caddypanel.caddy" >&2
+    fi
+
+    rm -f "$tmp"
+}
+
 fix_permissions() {
     chown -R www-data:www-data "$APP_DIR"
     chown -R root:root "$APP_DIR/bin"
@@ -223,6 +279,7 @@ configure_cron
 fix_permissions
 configure_cli
 configure_php_fpm_systemd_access
+render_panel_caddy_config
 record_version
 
 echo "post-update completed for $TARGET_REV"

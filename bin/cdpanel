@@ -96,6 +96,32 @@ panel_socket() {
     echo "${socket:-/run/php/php8.4-fpm.sock}"
 }
 
+sql_escape() {
+    printf "%s" "$1" | sed "s/'/''/g"
+}
+
+ensure_panel_php_settings() {
+    local default_version default_socket now
+
+    if [[ ! -f "$DB_PATH" ]] || ! command -v sqlite3 >/dev/null 2>&1; then
+        return 0
+    fi
+
+    default_version="$(setting default_php_version 8.4)"
+    default_socket="$(setting default_php_fpm_socket /run/php/php8.4-fpm.sock)"
+    now="$(date '+%Y-%m-%d %H:%M:%S')"
+
+    sqlite3 "$DB_PATH" <<SQL
+INSERT INTO settings (key, value, created_at, updated_at)
+SELECT 'panel_php_version', '$(sql_escape "${default_version:-8.4}")', '$now', '$now'
+WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key = 'panel_php_version');
+
+INSERT INTO settings (key, value, created_at, updated_at)
+SELECT 'panel_php_fpm_socket', '$(sql_escape "${default_socket:-/run/php/php8.4-fpm.sock}")', '$now', '$now'
+WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key = 'panel_php_fpm_socket');
+SQL
+}
+
 update_args() {
     printf 'repo_path %s repository_url %s branch %s cache_path %s' "$APP_DIR" "$REPOSITORY_URL" "$BRANCH" "$CACHE_PATH"
 }
@@ -184,6 +210,8 @@ doctor_cmd() {
     else
         warn "Caddy binary or Caddyfile missing"
     fi
+
+    check_caddy_php_sockets || true
 }
 
 fix_permissions() {
@@ -273,10 +301,72 @@ EOF
     warn "Restart $service to apply the override: sudo systemctl restart $service"
 }
 
+render_panel_caddy_config() {
+    local template domain socket tmp
+
+    template="$APP_DIR/caddy/templates/panel.caddy.tpl"
+
+    if [[ ! -f "$template" ]]; then
+        warn "Panel Caddy template missing: $template"
+        return 0
+    fi
+
+    domain="$(panel_domain)"
+    socket="$(panel_socket)"
+
+    if [[ -z "$domain" || -z "$socket" ]]; then
+        warn "Panel domain or PHP-FPM socket is empty"
+        return 0
+    fi
+
+    mkdir -p /etc/caddy/sites
+    tmp="$(mktemp)"
+
+    awk -v domain="$domain" -v socket="$socket" '{
+        gsub(/\{panel_domain\}/, domain)
+        gsub(/\{panel_php_fpm_socket\}/, socket)
+        print
+    }' "$template" > "$tmp"
+
+    if [[ -f /etc/caddy/sites/caddypanel.caddy ]]; then
+        cp /etc/caddy/sites/caddypanel.caddy "/etc/caddy/sites/caddypanel.caddy.bak.$(date +%Y%m%d%H%M%S)" || true
+    fi
+
+    cp "$tmp" /etc/caddy/sites/caddypanel.caddy
+    rm -f "$tmp"
+    ok "Panel Caddy config rendered with $socket"
+}
+
+check_caddy_php_sockets() {
+    local sockets missing socket
+
+    sockets="$(grep -RhoE '/run/php/php[0-9]+\.[0-9]+-fpm\.sock' /etc/caddy/Caddyfile /etc/caddy/sites/*.caddy 2>/dev/null | sort -u || true)"
+
+    if [[ -z "$sockets" ]]; then
+        return 0
+    fi
+
+    missing=0
+
+    while IFS= read -r socket; do
+        [[ -z "$socket" ]] && continue
+
+        if [[ -S "$socket" || -e "$socket" ]]; then
+            ok "Referenced PHP-FPM socket exists: $socket"
+        else
+            fail "Caddy references missing PHP-FPM socket: $socket"
+            missing=1
+        fi
+    done <<< "$sockets"
+
+    return "$missing"
+}
+
 repair_cmd() {
     need_root repair
 
     echo "Repairing CaddyPanel..."
+    ensure_panel_php_settings
     fix_permissions
     ok "File permissions repaired"
 
@@ -293,6 +383,7 @@ repair_cmd() {
     fi
 
     configure_php_fpm_systemd_access
+    render_panel_caddy_config
 
     if [[ -x "$APP_DIR/bin/post-update" ]]; then
         if "$APP_DIR/bin/post-update" app_dir "$APP_DIR" target_rev "$(version_value)"; then
@@ -309,6 +400,8 @@ repair_cmd() {
 
 repair_php_cmd() {
     need_root repair-php
+
+    ensure_panel_php_settings
 
     local socket version
     socket="$(panel_socket)"
@@ -331,6 +424,13 @@ repair_php_cmd() {
     if [[ "$version" =~ ^[0-9]+\.[0-9]+$ && -x "$APP_DIR/bin/php-fpm-mark-manual" ]]; then
         "$APP_DIR/bin/php-fpm-mark-manual" version "$version" || true
         ok "PHP $version packages marked manual when installed"
+    fi
+
+    render_panel_caddy_config
+    check_caddy_php_sockets || true
+
+    if command -v caddy >/dev/null 2>&1 && [[ -f /etc/caddy/Caddyfile ]]; then
+        caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy >/dev/null 2>&1 || true
     fi
 }
 
