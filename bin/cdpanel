@@ -1,0 +1,378 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+APP_DIR="${CADDYPANEL_APP_DIR:-/opt/caddypanel}"
+DB_PATH="$APP_DIR/var/data/caddypanel.sqlite"
+REPOSITORY_URL="${CADDYPANEL_REPOSITORY_URL:-https://github.com/marchkov/CaddyPanel.git}"
+BRANCH="${CADDYPANEL_BRANCH:-main}"
+CACHE_PATH="$APP_DIR/var/update-cache/repo"
+
+usage() {
+    cat <<'EOF'
+CaddyPanel recovery CLI
+
+Usage:
+  cdpanel <command>
+
+Commands:
+  status          Show core service and file health
+  doctor          Run diagnostics with OK/WARN/FAIL output
+  check-updates   Check Git updates for the panel
+  update          Apply panel updates from the configured repository
+  repair          Repair common panel file, sudoers, cron, schema, and Caddy issues
+  repair-php      Check PHP-FPM runtimes and protect the panel PHP branch from autoremove
+  logs            Show recent panel, Caddy, PHP-FPM, update, and backup logs
+  version         Show installed panel version
+  help            Show this help
+
+Run without a command for an interactive menu.
+EOF
+}
+
+need_root() {
+    if [[ "${EUID}" -ne 0 ]]; then
+        echo "This command must be run as root. Try: sudo cdpanel $*" >&2
+        exit 1
+    fi
+}
+
+ok() {
+    printf 'OK   %s\n' "$1"
+}
+
+warn() {
+    printf 'WARN %s\n' "$1"
+}
+
+fail() {
+    printf 'FAIL %s\n' "$1"
+}
+
+service_status() {
+    local service="$1"
+
+    if ! command -v systemctl >/dev/null 2>&1; then
+        echo "unknown"
+        return
+    fi
+
+    if systemctl is-active --quiet "$service" 2>/dev/null; then
+        echo "active"
+        return
+    fi
+
+    systemctl is-active "$service" 2>/dev/null || echo "unknown"
+}
+
+setting() {
+    local key="$1"
+    local fallback="${2:-}"
+
+    if [[ -f "$DB_PATH" ]] && command -v sqlite3 >/dev/null 2>&1; then
+        sqlite3 "$DB_PATH" "SELECT value FROM settings WHERE key='$key' LIMIT 1;" 2>/dev/null || true
+        return
+    fi
+
+    echo "$fallback"
+}
+
+panel_domain() {
+    local domain
+
+    domain="$(setting panel_domain localhost)"
+    echo "${domain:-localhost}"
+}
+
+panel_socket() {
+    local socket
+
+    socket="$(setting panel_php_fpm_socket)"
+
+    if [[ -z "$socket" ]]; then
+        socket="$(setting default_php_fpm_socket /run/php/php8.4-fpm.sock)"
+    fi
+
+    echo "${socket:-/run/php/php8.4-fpm.sock}"
+}
+
+update_args() {
+    printf 'repo_path %s repository_url %s branch %s cache_path %s' "$APP_DIR" "$REPOSITORY_URL" "$BRANCH" "$CACHE_PATH"
+}
+
+run_update_check() {
+    "$APP_DIR/bin/update-check" repo_path "$APP_DIR" repository_url "$REPOSITORY_URL" branch "$BRANCH" cache_path "$CACHE_PATH"
+}
+
+run_update_apply() {
+    "$APP_DIR/bin/update-apply" repo_path "$APP_DIR" repository_url "$REPOSITORY_URL" branch "$BRANCH" cache_path "$CACHE_PATH"
+}
+
+status_cmd() {
+    echo "CaddyPanel status"
+    echo
+    echo "App dir: $APP_DIR"
+    echo "Database: $DB_PATH"
+    echo "Panel domain: $(panel_domain)"
+    echo "Panel PHP-FPM socket: $(panel_socket)"
+    echo
+    echo "Services:"
+    echo "  caddy: $(service_status caddy)"
+    echo "  mariadb: $(service_status mariadb)"
+    echo "  cron: $(service_status cron)"
+    echo
+    echo "PHP-FPM:"
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print "  " $1 " " $2}' || true
+    else
+        echo "  systemctl unavailable"
+    fi
+}
+
+doctor_cmd() {
+    echo "CaddyPanel doctor"
+    echo
+
+    [[ -d "$APP_DIR" ]] && ok "App directory exists: $APP_DIR" || fail "App directory missing: $APP_DIR"
+    [[ -f "$DB_PATH" ]] && ok "SQLite database exists" || fail "SQLite database missing: $DB_PATH"
+    [[ -x "$APP_DIR/bin/update-apply" ]] && ok "update-apply is executable" || fail "update-apply is not executable"
+    [[ -x "$APP_DIR/bin/post-update" ]] && ok "post-update is executable" || fail "post-update is not executable"
+
+    if [[ -f /etc/sudoers.d/caddypanel ]]; then
+        if visudo -cf /etc/sudoers.d/caddypanel >/dev/null 2>&1; then
+            ok "sudoers file parses"
+        else
+            fail "sudoers file does not parse"
+        fi
+    else
+        warn "sudoers file missing: /etc/sudoers.d/caddypanel"
+    fi
+
+    [[ -f /etc/cron.d/caddypanel ]] && ok "cron file exists" || warn "cron file missing: /etc/cron.d/caddypanel"
+
+    local socket
+    socket="$(panel_socket)"
+
+    if [[ -S "$socket" || -e "$socket" ]]; then
+        ok "Panel PHP-FPM socket exists: $socket"
+    else
+        fail "Panel PHP-FPM socket missing: $socket"
+    fi
+
+    if command -v caddy >/dev/null 2>&1 && [[ -f /etc/caddy/Caddyfile ]]; then
+        if caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; then
+            ok "Caddy config validates"
+        else
+            fail "Caddy config validation failed"
+        fi
+    else
+        warn "Caddy binary or Caddyfile missing"
+    fi
+}
+
+fix_permissions() {
+    chown -R www-data:www-data "$APP_DIR" || true
+    chown -R root:root "$APP_DIR/bin" || true
+    find "$APP_DIR/bin" -type f -exec chmod 755 {} \; || true
+
+    if [[ -d "$APP_DIR/config" ]]; then
+        chown root:www-data "$APP_DIR/config" || true
+        chmod 750 "$APP_DIR/config" || true
+    fi
+
+    if [[ -f "$APP_DIR/config/secret.key" ]]; then
+        chown root:www-data "$APP_DIR/config/secret.key" || true
+        chmod 640 "$APP_DIR/config/secret.key" || true
+    fi
+
+    if [[ -f "$APP_DIR/config/mariadb-service.cnf" ]]; then
+        chown root:www-data "$APP_DIR/config/mariadb-service.cnf" || true
+        chmod 640 "$APP_DIR/config/mariadb-service.cnf" || true
+    fi
+}
+
+refresh_sudoers() {
+    if [[ ! -f "$APP_DIR/install/sudoers.tpl" ]]; then
+        warn "sudoers template missing"
+        return
+    fi
+
+    cp "$APP_DIR/install/sudoers.tpl" /etc/sudoers.d/caddypanel
+    chmod 440 /etc/sudoers.d/caddypanel
+    visudo -cf /etc/sudoers.d/caddypanel >/dev/null
+}
+
+refresh_cron() {
+    mkdir -p "$APP_DIR/var/logs"
+    chown -R www-data:www-data "$APP_DIR/var/logs"
+
+    cat > /etc/cron.d/caddypanel <<EOF
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+* * * * * www-data cd $APP_DIR && APP_ENV=production /usr/bin/php $APP_DIR/bin/backup-scheduler.php >> $APP_DIR/var/logs/backup-scheduler.log 2>&1
+0 * * * * www-data cd $APP_DIR && APP_ENV=production /usr/bin/php $APP_DIR/bin/update-cron.php >> $APP_DIR/var/logs/update-cron.log 2>&1
+EOF
+    chmod 644 /etc/cron.d/caddypanel
+}
+
+repair_cmd() {
+    need_root repair
+
+    echo "Repairing CaddyPanel..."
+    fix_permissions
+    ok "File permissions repaired"
+
+    if refresh_sudoers; then
+        ok "sudoers refreshed"
+    else
+        warn "sudoers refresh failed"
+    fi
+
+    if refresh_cron; then
+        ok "cron refreshed"
+    else
+        warn "cron refresh failed"
+    fi
+
+    if [[ -x "$APP_DIR/bin/post-update" ]]; then
+        if "$APP_DIR/bin/post-update" app_dir "$APP_DIR" target_rev "$(version_value)"; then
+            ok "post-update completed"
+        else
+            warn "post-update returned errors"
+        fi
+    fi
+
+    if command -v caddy >/dev/null 2>&1 && [[ -f /etc/caddy/Caddyfile ]]; then
+        caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy >/dev/null 2>&1 || true
+    fi
+}
+
+repair_php_cmd() {
+    need_root repair-php
+
+    local socket version
+    socket="$(panel_socket)"
+
+    if [[ "$socket" =~ php([0-9]+\.[0-9]+)-fpm\.sock ]]; then
+        version="${BASH_REMATCH[1]}"
+    else
+        version="$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;' 2>/dev/null || true)"
+    fi
+
+    echo "Panel PHP-FPM socket: $socket"
+
+    if [[ -S "$socket" || -e "$socket" ]]; then
+        ok "Panel PHP-FPM socket exists"
+    else
+        fail "Panel PHP-FPM socket is missing"
+        warn "Open PHP Versions in the panel after recovery and switch the panel/default runtime."
+    fi
+
+    if [[ "$version" =~ ^[0-9]+\.[0-9]+$ && -x "$APP_DIR/bin/php-fpm-mark-manual" ]]; then
+        "$APP_DIR/bin/php-fpm-mark-manual" version "$version" || true
+        ok "PHP $version packages marked manual when installed"
+    fi
+}
+
+check_updates_cmd() {
+    run_update_check
+}
+
+update_cmd() {
+    need_root update
+    run_update_apply
+}
+
+version_value() {
+    local value
+
+    value="$(setting app_version)"
+
+    if [[ -z "$value" && -d "$APP_DIR/.git" ]]; then
+        value="$(git -C "$APP_DIR" rev-parse HEAD 2>/dev/null || true)"
+    fi
+
+    echo "${value:-unknown}"
+}
+
+version_cmd() {
+    echo "Installed version: $(version_value)"
+    echo "Repository: $REPOSITORY_URL"
+    echo "Branch: $BRANCH"
+}
+
+logs_cmd() {
+    echo "CaddyPanel logs"
+    echo
+
+    if [[ -f "$APP_DIR/var/logs/panel.log" ]]; then
+        echo "== panel.log =="
+        tail -n 80 "$APP_DIR/var/logs/panel.log" || true
+    fi
+
+    if [[ -f "$APP_DIR/var/logs/update-cron.log" ]]; then
+        echo "== update-cron.log =="
+        tail -n 80 "$APP_DIR/var/logs/update-cron.log" || true
+    fi
+
+    if [[ -f "$APP_DIR/var/logs/backup-scheduler.log" ]]; then
+        echo "== backup-scheduler.log =="
+        tail -n 80 "$APP_DIR/var/logs/backup-scheduler.log" || true
+    fi
+
+    if command -v journalctl >/dev/null 2>&1; then
+        echo "== caddy journal =="
+        journalctl -u caddy -n 80 --no-pager 2>/dev/null || true
+        echo "== php-fpm journal =="
+        journalctl -u 'php*-fpm' -n 80 --no-pager 2>/dev/null || true
+    fi
+}
+
+menu() {
+    while true; do
+        cat <<'EOF'
+
+CaddyPanel recovery
+1) Check panel status
+2) Run doctor
+3) Check updates
+4) Install updates
+5) Repair panel
+6) Repair PHP
+7) Show logs
+8) Show version
+0) Exit
+EOF
+        read -r -p "Choose: " choice
+
+        case "$choice" in
+            1) status_cmd ;;
+            2) doctor_cmd ;;
+            3) check_updates_cmd ;;
+            4) update_cmd ;;
+            5) repair_cmd ;;
+            6) repair_php_cmd ;;
+            7) logs_cmd ;;
+            8) version_cmd ;;
+            0) exit 0 ;;
+            *) echo "Unknown choice." ;;
+        esac
+    done
+}
+
+command="${1:-menu}"
+
+case "$command" in
+    menu) menu ;;
+    status) status_cmd ;;
+    doctor) doctor_cmd ;;
+    check-updates) check_updates_cmd ;;
+    update) update_cmd ;;
+    repair) repair_cmd ;;
+    repair-php) repair_php_cmd ;;
+    logs) logs_cmd ;;
+    version) version_cmd ;;
+    help|--help|-h) usage ;;
+    *) usage; exit 2 ;;
+esac

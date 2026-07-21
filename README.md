@@ -420,6 +420,18 @@ Important files and directories:
 /var/log/caddypanel
 ```
 
+If the web panel is unavailable, use the recovery CLI:
+
+```bash
+sudo cdpanel doctor
+sudo cdpanel repair
+sudo cdpanel check-updates
+sudo cdpanel update
+sudo cdpanel repair-php
+```
+
+Running `sudo cdpanel` without arguments opens an interactive recovery menu. The CLI is installed as `/usr/local/bin/cdpanel` and points to `/opt/caddypanel/bin/cdpanel`.
+
 Post-install checks:
 
 ```bash

@@ -415,6 +415,12 @@ EOF
     fi
 }
 
+configure_cli() {
+    if [[ -f "$APP_DIR/bin/cdpanel" ]]; then
+        ln -sf "$APP_DIR/bin/cdpanel" /usr/local/bin/cdpanel
+    fi
+}
+
 configure_mariadb_service_user() {
     SERVICE_PASSWORD="$(openssl rand -base64 32 | tr -d '\n')"
 
@@ -477,6 +483,7 @@ main() {
     configure_caddy
     configure_sudoers
     configure_cron
+    configure_cli
     configure_mariadb_service_user
     start_services
     print_summary

@@ -129,6 +129,14 @@ EOF
     fi
 }
 
+configure_cli() {
+    if [[ -f "$APP_DIR/bin/cdpanel" ]]; then
+        if ! ln -sf "$APP_DIR/bin/cdpanel" /usr/local/bin/cdpanel; then
+            echo "warning: unable to update /usr/local/bin/cdpanel symlink" >&2
+        fi
+    fi
+}
+
 fix_permissions() {
     chown -R www-data:www-data "$APP_DIR"
     chown -R root:root "$APP_DIR/bin"
@@ -162,6 +170,7 @@ ensure_default_modules
 configure_sudoers
 configure_cron
 fix_permissions
+configure_cli
 record_version
 
 echo "post-update completed for $TARGET_REV"
