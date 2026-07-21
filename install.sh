@@ -177,6 +177,22 @@ configure_caddy_php_access() {
     fi
 }
 
+configure_php_fpm_systemd_access() {
+    local dropin_dir="/etc/systemd/system/${PHP_FPM_SERVICE}.service.d"
+
+    if ! command -v systemctl >/dev/null 2>&1; then
+        return
+    fi
+
+    mkdir -p "$dropin_dir"
+    cat > "$dropin_dir/caddypanel.conf" <<'EOF'
+[Service]
+ReadWritePaths=/etc/caddy /etc/caddy/sites /opt/caddypanel /var/www/sites /var/log/caddypanel
+EOF
+
+    systemctl daemon-reload
+}
+
 copy_application() {
     if [[ -z "$SOURCE_DIR" || ! -d "$SOURCE_DIR" ]]; then
         echo "CaddyPanel source directory was not prepared." >&2
@@ -476,6 +492,7 @@ main() {
     create_directories
     configure_log_directory
     configure_caddy_php_access
+    configure_php_fpm_systemd_access
     copy_application
     mark_php_runtime_manual
     install_integrated_apps

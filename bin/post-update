@@ -137,6 +137,57 @@ configure_cli() {
     fi
 }
 
+panel_php_fpm_service() {
+    local socket
+
+    socket="$(sqlite3 "$DB_PATH" "SELECT value FROM settings WHERE key='panel_php_fpm_socket' LIMIT 1;" 2>/dev/null || true)"
+
+    if [[ -z "$socket" ]]; then
+        socket="$(sqlite3 "$DB_PATH" "SELECT value FROM settings WHERE key='default_php_fpm_socket' LIMIT 1;" 2>/dev/null || true)"
+    fi
+
+    if [[ "$socket" =~ php([0-9]+\.[0-9]+)-fpm\.sock ]]; then
+        echo "php${BASH_REMATCH[1]}-fpm"
+        return
+    fi
+
+    systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print $1}' | sed 's/\.service$//' | sort -V | tail -n 1
+}
+
+configure_php_fpm_systemd_access() {
+    local service
+    local dropin_dir
+
+    if ! command -v systemctl >/dev/null 2>&1; then
+        return 0
+    fi
+
+    service="$(panel_php_fpm_service)"
+
+    if [[ -z "$service" ]]; then
+        echo "warning: unable to detect panel PHP-FPM service for systemd access override" >&2
+        return 0
+    fi
+
+    dropin_dir="/etc/systemd/system/${service}.service.d"
+
+    if ! mkdir -p "$dropin_dir"; then
+        echo "warning: unable to create $dropin_dir" >&2
+        return 0
+    fi
+
+    if ! cat > "$dropin_dir/caddypanel.conf" <<'EOF'
+[Service]
+ReadWritePaths=/etc/caddy /etc/caddy/sites /opt/caddypanel /var/www/sites /var/log/caddypanel
+EOF
+    then
+        echo "warning: unable to update PHP-FPM systemd override for $service" >&2
+        return 0
+    fi
+
+    systemctl daemon-reload >/dev/null 2>&1 || true
+}
+
 fix_permissions() {
     chown -R www-data:www-data "$APP_DIR"
     chown -R root:root "$APP_DIR/bin"
@@ -171,6 +222,7 @@ configure_sudoers
 configure_cron
 fix_permissions
 configure_cli
+configure_php_fpm_systemd_access
 record_version
 
 echo "post-update completed for $TARGET_REV"

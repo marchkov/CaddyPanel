@@ -159,6 +159,22 @@ doctor_cmd() {
         fail "Panel PHP-FPM socket missing: $socket"
     fi
 
+    if command -v systemctl >/dev/null 2>&1; then
+        local service read_write_paths
+
+        service="$(panel_php_fpm_service)"
+
+        if [[ -n "$service" ]]; then
+            read_write_paths="$(systemctl show "$service" -p ReadWritePaths --value 2>/dev/null || true)"
+
+            if [[ "$read_write_paths" == *"/etc/caddy"* ]]; then
+                ok "$service can write configured Caddy paths"
+            else
+                fail "$service is missing ReadWritePaths for /etc/caddy"
+            fi
+        fi
+    fi
+
     if command -v caddy >/dev/null 2>&1 && [[ -f /etc/caddy/Caddyfile ]]; then
         if caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; then
             ok "Caddy config validates"
@@ -216,6 +232,47 @@ EOF
     chmod 644 /etc/cron.d/caddypanel
 }
 
+panel_php_fpm_service() {
+    local socket
+
+    socket="$(panel_socket)"
+
+    if [[ "$socket" =~ php([0-9]+\.[0-9]+)-fpm\.sock ]]; then
+        echo "php${BASH_REMATCH[1]}-fpm"
+        return
+    fi
+
+    systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print $1}' | sed 's/\.service$//' | sort -V | tail -n 1
+}
+
+configure_php_fpm_systemd_access() {
+    local service
+    local dropin_dir
+
+    if ! command -v systemctl >/dev/null 2>&1; then
+        warn "systemctl unavailable; skipped PHP-FPM systemd override"
+        return 0
+    fi
+
+    service="$(panel_php_fpm_service)"
+
+    if [[ -z "$service" ]]; then
+        warn "Unable to detect panel PHP-FPM service"
+        return 0
+    fi
+
+    dropin_dir="/etc/systemd/system/${service}.service.d"
+    mkdir -p "$dropin_dir"
+    cat > "$dropin_dir/caddypanel.conf" <<'EOF'
+[Service]
+ReadWritePaths=/etc/caddy /etc/caddy/sites /opt/caddypanel /var/www/sites /var/log/caddypanel
+EOF
+
+    systemctl daemon-reload
+    ok "PHP-FPM systemd write access configured for $service"
+    warn "Restart $service to apply the override: sudo systemctl restart $service"
+}
+
 repair_cmd() {
     need_root repair
 
@@ -234,6 +291,8 @@ repair_cmd() {
     else
         warn "cron refresh failed"
     fi
+
+    configure_php_fpm_systemd_access
 
     if [[ -x "$APP_DIR/bin/post-update" ]]; then
         if "$APP_DIR/bin/post-update" app_dir "$APP_DIR" target_rev "$(version_value)"; then
