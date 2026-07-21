@@ -18,6 +18,15 @@ if ! command -v apt-mark >/dev/null 2>&1; then
     exit 2
 fi
 
+run_host_command() {
+    if command -v systemd-run >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
+        systemd-run --quiet --wait --collect --pipe --service-type=exec "$@"
+        return
+    fi
+
+    "$@"
+}
+
 packages=(
     "php${VERSION}-fpm"
     "php${VERSION}-cli"
@@ -45,4 +54,4 @@ if [[ "${#installed[@]}" -eq 0 ]]; then
     exit 1
 fi
 
-apt-mark manual "${installed[@]}"
+run_host_command apt-mark manual "${installed[@]}"

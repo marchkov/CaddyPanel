@@ -18,6 +18,15 @@ if ! command -v apt-get >/dev/null 2>&1; then
     exit 2
 fi
 
+run_host_command() {
+    if command -v systemd-run >/dev/null 2>&1 && [[ -d /run/systemd/system ]]; then
+        systemd-run --quiet --wait --collect --pipe --service-type=exec "$@"
+        return
+    fi
+
+    "$@"
+}
+
 packages=(
     "php${VERSION}-fpm"
     "php${VERSION}-cli"
@@ -40,21 +49,17 @@ configure_systemd_access() {
         return
     fi
 
-    mkdir -p "$dropin_dir"
-    cat > "$dropin_dir/caddypanel.conf" <<'EOF'
-[Service]
-ReadWritePaths=/etc/caddy /etc/caddy/sites /opt/caddypanel /var/www/sites /var/log/caddypanel
-EOF
+    run_host_command /bin/sh -c "mkdir -p '$dropin_dir' && printf '%s\n' '[Service]' 'ReadWritePaths=/etc/caddy /etc/caddy/sites /opt/caddypanel /var/www/sites /var/log/caddypanel' > '$dropin_dir/caddypanel.conf'"
 
-    systemctl daemon-reload
+    run_host_command systemctl daemon-reload
 }
 
-apt-get install -y "${packages[@]}"
-apt-mark manual "${packages[@]}" >/dev/null
+run_host_command apt-get install -y "${packages[@]}"
+run_host_command apt-mark manual "${packages[@]}" >/dev/null
 configure_systemd_access
 
 if command -v systemctl >/dev/null 2>&1; then
-    systemctl enable --now "php${VERSION}-fpm" >/dev/null 2>&1 || true
+    run_host_command systemctl enable --now "php${VERSION}-fpm" >/dev/null 2>&1 || true
 fi
 
 echo "Installed PHP ${VERSION} FPM runtime and configured CaddyPanel systemd write paths."
