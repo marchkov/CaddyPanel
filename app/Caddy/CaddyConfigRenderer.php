@@ -22,6 +22,10 @@ class CaddyConfigRenderer
             return $this->renderTemplate($site, $aliases);
         }
 
+        if ($this->siteBlockCount($existingConfig) !== 1) {
+            return $this->renderTemplate($site, $aliases);
+        }
+
         $hosts = $this->hosts($site, $aliases);
         $config = $existingConfig;
 
@@ -46,6 +50,13 @@ class CaddyConfigRenderer
         $config = preg_replace('/^\s*output\s+file\s+.+$/m', '        output file ' . $accessLog . ' {', $config, 1) ?? $config;
 
         return rtrim($config) . "\n";
+    }
+
+    private function siteBlockCount(string $config): int
+    {
+        preg_match_all('/^[^#\s][^{\n]*\{\s*$/m', $config, $matches);
+
+        return count($matches[0] ?? []);
     }
 
     public function writeConfig(array $site, string $config, string $suffix = '.caddy.pending'): string

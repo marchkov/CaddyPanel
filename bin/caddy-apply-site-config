@@ -39,6 +39,66 @@ fi
 
 mkdir -p /etc/caddy/sites
 
+if ! touch /etc/caddy/sites/.caddypanel-write-test 2>/dev/null; then
+    echo "Caddy sites directory is not writable: /etc/caddy/sites. Check filesystem mount state and permissions." >&2
+    exit 1
+fi
+
+rm -f /etc/caddy/sites/.caddypanel-write-test
+
+extract_hosts() {
+    local file="$1"
+
+    awk '
+        /^[[:space:]]*($|#)/ { next }
+        /^[^[:space:]][^{]*\{[[:space:]]*$/ {
+            line=$0
+            sub(/\{[[:space:]]*$/, "", line)
+            gsub(",", " ", line)
+
+            count=split(line, hosts, /[[:space:]]+/)
+
+            for (i = 1; i <= count; i++) {
+                host=hosts[i]
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", host)
+
+                if (host == "" || host ~ /^:/ || host ~ /^\*/ || host ~ /^http:\/\// || host ~ /^https:\/\//) {
+                    continue
+                }
+
+                sub(/^https?:\/\//, "", host)
+                sub(/\/.*$/, "", host)
+                sub(/:[0-9]+$/, "", host)
+
+                if (host ~ /^([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/) {
+                    print tolower(host)
+                }
+            }
+        }
+    ' "$file"
+}
+
+duplicate_hosts="$(extract_hosts "$PENDING_PATH" | sort | uniq -d)"
+
+if [[ -n "$duplicate_hosts" ]]; then
+    echo "Pending Caddy config defines duplicate host(s): $(printf '%s' "$duplicate_hosts" | paste -sd ', ' -). Remove duplicate site blocks or aliases before applying." >&2
+    exit 1
+fi
+
+while IFS= read -r pending_host; do
+    [[ -z "$pending_host" ]] && continue
+
+    while IFS= read -r existing_file; do
+        [[ "$existing_file" == "$FINAL_PATH" ]] && continue
+        [[ -f "$existing_file" ]] || continue
+
+        if extract_hosts "$existing_file" | grep -qx "$pending_host"; then
+            echo "Host $pending_host is already configured in $existing_file. Remove it from that site or from this site's aliases before applying Caddy config." >&2
+            exit 1
+        fi
+    done < <(find /etc/caddy/sites -maxdepth 1 -type f -name '*.caddy' | sort)
+done < <(extract_hosts "$PENDING_PATH" | sort -u)
+
 caddy validate --adapter caddyfile --config "$PENDING_PATH"
 
 BACKUP_PATH=""
