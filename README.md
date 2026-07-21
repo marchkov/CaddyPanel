@@ -343,7 +343,7 @@ It also checks PHP-FPM versions available from the server's configured APT repos
 bin/php-fpm-available
 ```
 
-The panel stores detected versions in SQLite, lets an admin choose the default PHP-FPM socket, shows how many active sites are pinned to each PHP version, and uses detected versions in the site creation form. It does not add third-party repositories. If a PHP-FPM version is available from already configured APT repositories, admins can install it from the PHP Versions page. Installed versions can be removed only when they are not used by the panel, not selected as default, and have no active sites pinned to them.
+The panel stores detected versions in SQLite, lets an admin choose the default PHP-FPM socket, shows how many active sites are pinned to each PHP version, and uses detected versions in the site creation form. It does not add third-party repositories. If a PHP-FPM version is available from already configured APT repositories, admins can install it from the PHP Versions page. Installed versions can be removed only when they are not used by the panel, not selected as default, and have no active sites pinned to them. PHP versions installed from the panel receive a systemd `ReadWritePaths` override so they can safely become the panel runtime later.
 
 To reduce the chance that a distribution upgrade removes the PHP branch used by CaddyPanel, the installer marks the detected versioned PHP packages as manually installed with:
 

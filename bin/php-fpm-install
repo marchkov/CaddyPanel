@@ -32,11 +32,29 @@ packages=(
     "php${VERSION}-intl"
 )
 
+configure_systemd_access() {
+    local service="php${VERSION}-fpm"
+    local dropin_dir="/etc/systemd/system/${service}.service.d"
+
+    if ! command -v systemctl >/dev/null 2>&1; then
+        return
+    fi
+
+    mkdir -p "$dropin_dir"
+    cat > "$dropin_dir/caddypanel.conf" <<'EOF'
+[Service]
+ReadWritePaths=/etc/caddy /etc/caddy/sites /opt/caddypanel /var/www/sites /var/log/caddypanel
+EOF
+
+    systemctl daemon-reload
+}
+
 apt-get install -y "${packages[@]}"
 apt-mark manual "${packages[@]}" >/dev/null
+configure_systemd_access
 
 if command -v systemctl >/dev/null 2>&1; then
     systemctl enable --now "php${VERSION}-fpm" >/dev/null 2>&1 || true
 fi
 
-echo "Installed PHP ${VERSION} FPM runtime."
+echo "Installed PHP ${VERSION} FPM runtime and configured CaddyPanel systemd write paths."
