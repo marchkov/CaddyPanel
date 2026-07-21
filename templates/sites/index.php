@@ -54,7 +54,15 @@
                                     </a>
                                 </td>
                                 <td style="padding: 12px; border-bottom: 1px solid var(--border);">
-                                    <?php echo htmlspecialchars($site['type'], ENT_QUOTES, 'UTF-8'); ?>
+                                    <?php
+                                    $siteType = (string) $site['type'];
+
+                                    if ($siteType === 'php') {
+                                        $siteType = 'PHP ' . (($site['php_version'] ?? '') !== '' ? $site['php_version'] : '-');
+                                    }
+
+                                    echo htmlspecialchars($siteType, ENT_QUOTES, 'UTF-8');
+                                    ?>
                                 </td>
                                 <td style="padding: 12px; border-bottom: 1px solid var(--border);">
                                     <?php echo htmlspecialchars($site['status'], ENT_QUOTES, 'UTF-8'); ?>
