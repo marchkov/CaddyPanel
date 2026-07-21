@@ -318,6 +318,7 @@ $router->get('/updates', [$updateController, 'index']);
 $router->post('/updates', [$updateController, 'action']);
 $router->get('/php-versions', [$phpVersionController, 'index']);
 $router->post('/php-versions', [$phpVersionController, 'index']);
+$router->get('/php-versions/jobs', [$phpVersionController, 'jobs']);
 $router->get('/admin-tasks', [$adminTasksController, 'index']);
 $router->post('/admin-tasks', [$adminTasksController, 'index']);
 $router->get('/firewall', [$firewallController, 'index']);

@@ -34,6 +34,17 @@ class PhpVersionController
         ]));
     }
 
+    public function jobs(): void
+    {
+        $this->guard->requireModule('php_versions', ($this->viewData)());
+        $this->guard->requireAdmin();
+
+        header('Content-Type: application/json');
+        echo json_encode([
+            'jobs' => $this->versions->jobs(),
+        ], JSON_UNESCAPED_SLASHES);
+    }
+
     private function handleAction(Request $request): ?string
     {
         if (!Csrf::validate($request->post('_csrf_token'))) {

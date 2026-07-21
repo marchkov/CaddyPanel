@@ -40,6 +40,7 @@ class PhpVersionService
         $defaultSocket = $this->settings->get('default_php_fpm_socket', '/run/php/php8.4-fpm.sock');
         $panelVersion = $this->settings->get('panel_php_version', $defaultVersion);
         $panelSocket = $this->settings->get('panel_php_fpm_socket', $defaultSocket);
+        $jobsByVersion = $this->versions->latestJobsByVersion();
 
         foreach ($installed as &$row) {
             $row['site_count'] = $siteCounts[(string) $row['version']] ?? 0;
@@ -47,14 +48,16 @@ class PhpVersionService
             $row['is_panel_runtime'] = ((string) $row['version'] === (string) $panelVersion || (string) $row['fpm_socket'] === (string) $panelSocket) ? 1 : 0;
             $row['socket_exists'] = array_key_exists('socket_exists', $row) ? (bool) $row['socket_exists'] : $this->socketExists((string) $row['fpm_socket']);
             $row['runtime_status'] = $this->runtimeStatus($row);
+            $row['job'] = $jobsByVersion[(string) $row['version']] ?? null;
         }
 
         unset($row);
 
         return [
             'installed' => $installed,
-            'available' => $this->availableWithInstallState($installed, $snapshot['available']),
+            'available' => $this->availableWithInstallState($installed, $snapshot['available'], $jobsByVersion),
             'configured_missing' => $this->configuredMissing($installed, $siteCounts, $defaultVersion, $defaultSocket, $panelVersion, $panelSocket),
+            'jobs' => $this->versions->recentJobs(),
         ];
     }
 
@@ -109,32 +112,25 @@ class PhpVersionService
         $this->audit($userId, 'php_versions_mark_manual', 'success', 'Marked installed PHP ' . $version . ' packages as manually installed.', $ipAddress);
     }
 
-    public function install(string $version, int $userId, string $ipAddress): void
+    public function install(string $version, int $userId, string $ipAddress): int
     {
         if (preg_match('/^\d+\.\d+$/', $version) !== 1) {
             throw new \InvalidArgumentException('Invalid PHP version.');
         }
 
-        if (!$this->isAvailable($version, true)) {
+        if (!$this->isAvailable($version)) {
             throw new \InvalidArgumentException('PHP version is not available from the configured APT repositories.');
         }
 
         if ($this->env === 'local') {
             $this->audit($userId, 'php_versions_install', 'success', 'Local mode skipped PHP ' . $version . ' install.', $ipAddress);
-            return;
+            return 0;
         }
 
-        $result = $this->commands->run('php-fpm-install', ['version' => $version]);
-
-        if ($result['exit_code'] !== 0) {
-            throw new \RuntimeException($result['output']);
-        }
-
-        $this->refresh($userId, $ipAddress);
-        $this->audit($userId, 'php_versions_install', 'success', 'Installed PHP ' . $version . ' runtime. ' . $result['output'], $ipAddress);
+        return $this->queueJob('install', $version, $userId, $ipAddress);
     }
 
-    public function uninstall(string $version, int $userId, string $ipAddress): void
+    public function uninstall(string $version, int $userId, string $ipAddress): int
     {
         if (preg_match('/^\d+\.\d+$/', $version) !== 1) {
             throw new \InvalidArgumentException('Invalid PHP version.');
@@ -168,17 +164,36 @@ class PhpVersionService
 
         if ($this->env === 'local') {
             $this->audit($userId, 'php_versions_uninstall', 'success', 'Local mode skipped PHP ' . $version . ' uninstall.', $ipAddress);
-            return;
+            return 0;
         }
 
-        $result = $this->commands->run('php-fpm-uninstall', ['version' => $version]);
+        return $this->queueJob('uninstall', $version, $userId, $ipAddress);
+    }
+
+    public function jobs(): array
+    {
+        return $this->versions->recentJobs();
+    }
+
+    private function queueJob(string $action, string $version, int $userId, string $ipAddress): int
+    {
+        $active = $this->versions->findActiveJobForVersion($version);
+
+        if ($active) {
+            throw new \RuntimeException('PHP ' . $version . ' already has a running job.');
+        }
+
+        $jobId = $this->versions->createJob($action, $version, $userId, $ipAddress);
+        $result = $this->commands->run('php-fpm-job-start', ['job_id' => (string) $jobId]);
 
         if ($result['exit_code'] !== 0) {
+            $this->versions->failJobStart($jobId, $result['output']);
             throw new \RuntimeException($result['output']);
         }
 
-        $this->refresh($userId, $ipAddress);
-        $this->audit($userId, 'php_versions_uninstall', 'success', 'Uninstalled PHP ' . $version . ' runtime. ' . $result['output'], $ipAddress);
+        $this->audit($userId, 'php_versions_' . $action, 'queued', 'Queued PHP ' . $version . ' ' . $action . ' job #' . $jobId . '.', $ipAddress);
+
+        return $jobId;
     }
 
     public function setDefault(string $version, int $userId, string $ipAddress): void
@@ -365,7 +380,7 @@ class PhpVersionService
         return array_values(array_filter($decoded, fn ($row): bool => is_array($row) && isset($row['version'], $row['package'])));
     }
 
-    private function availableWithInstallState(array $installed, array $available): array
+    private function availableWithInstallState(array $installed, array $available, array $jobsByVersion): array
     {
         $installedByVersion = [];
 
@@ -384,6 +399,7 @@ class PhpVersionService
                 && $row['site_count'] === 0
                 && $row['is_default'] === 0
                 && $row['is_panel_runtime'] === 0;
+            $row['job'] = $jobsByVersion[$version] ?? null;
         }
 
         unset($row);

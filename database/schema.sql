@@ -136,6 +136,22 @@ CREATE TABLE IF NOT EXISTS php_versions (
     detected_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS php_version_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action TEXT NOT NULL,
+    version TEXT NOT NULL,
+    status TEXT NOT NULL,
+    exit_code INTEGER,
+    output TEXT,
+    created_by_user_id INTEGER,
+    ip_address TEXT,
+    started_at TEXT,
+    finished_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
 CREATE INDEX IF NOT EXISTS idx_modules_name ON modules(name);
 CREATE INDEX IF NOT EXISTS idx_settings_key ON settings(key);
@@ -149,3 +165,5 @@ CREATE INDEX IF NOT EXISTS idx_backup_jobs_site_id ON backup_jobs(site_id);
 CREATE INDEX IF NOT EXISTS idx_backup_jobs_next_run_at ON backup_jobs(next_run_at);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_lookup ON login_attempts(username, ip_address, attempted_at);
+CREATE INDEX IF NOT EXISTS idx_php_version_jobs_status ON php_version_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_php_version_jobs_version ON php_version_jobs(version);
