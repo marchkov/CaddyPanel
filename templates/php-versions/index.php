@@ -2,11 +2,6 @@
 $installed = $overview['installed'] ?? [];
 $available = $overview['available'] ?? [];
 $configuredMissing = $overview['configured_missing'] ?? [];
-$installedVersions = array_fill_keys(array_map(static fn (array $row): string => (string) $row['version'], $installed), true);
-$availableToInstall = array_values(array_filter(
-    $available,
-    static fn (array $row): bool => !isset($installedVersions[(string) $row['version']])
-));
 
 ob_start();
 ?>
@@ -27,12 +22,12 @@ ob_start();
         <div class="topbar">
             <div>
                 <h1 style="margin: 0;">PHP Versions</h1>
-                <div class="muted">Detected PHP-FPM runtimes and PHP versions available from this server's APT repositories.</div>
+                <div class="muted">Detected PHP-FPM runtimes and APT availability. System checks are cached for up to 7 days.</div>
             </div>
             <form method="post" action="/php-versions">
                 <?php echo \CaddyPanel\Core\Csrf::input(); ?>
                 <input type="hidden" name="action" value="refresh">
-                <button class="button primary" type="submit">Detect sockets</button>
+                <button class="button primary" type="submit">Refresh now</button>
             </form>
         </div>
 
@@ -130,9 +125,9 @@ ob_start();
         </section>
 
         <section class="card" style="margin-top: 16px;">
-            <h2 style="margin-top: 0;">Available To Install</h2>
-            <?php if ($availableToInstall === []): ?>
-                <p class="muted" style="margin-bottom: 0;">No additional PHP-FPM versions were found in the configured APT repositories.</p>
+            <h2 style="margin-top: 0;">Available PHP-FPM</h2>
+            <?php if ($available === []): ?>
+                <p class="muted" style="margin-bottom: 0;">No PHP-FPM versions were found in the configured APT repositories.</p>
             <?php else: ?>
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
@@ -140,14 +135,64 @@ ob_start();
                             <th style="text-align: left; padding: 10px;">Version</th>
                             <th style="text-align: left; padding: 10px;">Package</th>
                             <th style="text-align: left; padding: 10px;">Candidate</th>
+                            <th style="text-align: left; padding: 10px;">Installed</th>
+                            <th style="text-align: left; padding: 10px;">Sites</th>
+                            <th style="text-align: right; padding: 10px;">Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($availableToInstall as $version): ?>
+                        <?php foreach ($available as $version): ?>
                             <tr>
                                 <td style="padding: 10px;"><?php echo htmlspecialchars($version['version'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td style="padding: 10px;"><?php echo htmlspecialchars($version['package'], ENT_QUOTES, 'UTF-8'); ?></td>
                                 <td style="padding: 10px;"><?php echo htmlspecialchars($version['candidate'] ?? '-', ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td style="padding: 10px;">
+                                    <?php if (!empty($version['installed'])): ?>
+                                        <span class="badge">Installed</span>
+                                    <?php else: ?>
+                                        <span class="muted">-</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="padding: 10px;"><?php echo (int) ($version['site_count'] ?? 0); ?></td>
+                                <td style="padding: 10px; text-align: right;">
+                                    <?php if (!empty($version['installed'])): ?>
+                                        <?php if (!empty($version['can_uninstall'])): ?>
+                                            <form method="post" action="/php-versions" style="display: inline-block;">
+                                                <?php echo \CaddyPanel\Core\Csrf::input(); ?>
+                                                <input type="hidden" name="action" value="uninstall">
+                                                <input type="hidden" name="version" value="<?php echo htmlspecialchars($version['version'], ENT_QUOTES, 'UTF-8'); ?>">
+                                                <button class="button" type="submit">Uninstall</button>
+                                            </form>
+                                        <?php else: ?>
+                                            <span class="muted">
+                                                <?php
+                                                $reasons = [];
+
+                                                if (!empty($version['is_panel_runtime'])) {
+                                                    $reasons[] = 'panel';
+                                                }
+
+                                                if (!empty($version['is_default'])) {
+                                                    $reasons[] = 'default';
+                                                }
+
+                                                if ((int) ($version['site_count'] ?? 0) > 0) {
+                                                    $reasons[] = 'sites';
+                                                }
+
+                                                echo htmlspecialchars('In use: ' . implode(', ', $reasons), ENT_QUOTES, 'UTF-8');
+                                                ?>
+                                            </span>
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        <form method="post" action="/php-versions" style="display: inline-block;">
+                                            <?php echo \CaddyPanel\Core\Csrf::input(); ?>
+                                            <input type="hidden" name="action" value="install">
+                                            <input type="hidden" name="version" value="<?php echo htmlspecialchars($version['version'], ENT_QUOTES, 'UTF-8'); ?>">
+                                            <button class="button primary" type="submit">Install</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

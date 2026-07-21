@@ -58,6 +58,16 @@ class PhpVersionController
                 Response::redirect('/php-versions');
             }
 
+            if ($action === 'install') {
+                $this->versions->install((string) $request->post('version', ''), (int) $_SESSION['user']['id'], $request->ip());
+                Response::redirect('/php-versions');
+            }
+
+            if ($action === 'uninstall') {
+                $this->versions->uninstall((string) $request->post('version', ''), (int) $_SESSION['user']['id'], $request->ip());
+                Response::redirect('/php-versions');
+            }
+
             return 'Unknown action.';
         } catch (\Throwable $exception) {
             return $exception->getMessage();

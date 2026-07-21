@@ -23,6 +23,8 @@ class CommandRunner
         'system-status',
         'php-fpm-detect',
         'php-fpm-available',
+        'php-fpm-install',
+        'php-fpm-uninstall',
         'php-fpm-mark-manual',
         'admin-task',
         'firewall-task',

@@ -8,6 +8,9 @@ use CaddyPanel\System\CommandRunner;
 
 class PhpVersionService
 {
+    private const CACHE_TTL_SECONDS = 604800;
+    private const CACHE_KEY = 'php_versions_system_cache';
+
     public function __construct(
         private PhpVersionRepository $versions,
         private SettingRepository $settings,
@@ -30,7 +33,8 @@ class PhpVersionService
 
     public function overview(): array
     {
-        $installed = $this->currentInstalled();
+        $snapshot = $this->systemSnapshot();
+        $installed = $this->currentInstalled($snapshot);
         $siteCounts = $this->siteCountsByVersion();
         $defaultVersion = $this->settings->get('default_php_version', '8.4');
         $defaultSocket = $this->settings->get('default_php_fpm_socket', '/run/php/php8.4-fpm.sock');
@@ -49,14 +53,15 @@ class PhpVersionService
 
         return [
             'installed' => $installed,
-            'available' => $this->available(),
+            'available' => $this->availableWithInstallState($installed, $snapshot['available']),
             'configured_missing' => $this->configuredMissing($installed, $siteCounts, $defaultVersion, $defaultSocket, $panelVersion, $panelSocket),
         ];
     }
 
     public function refresh(int $userId, string $ipAddress): array
     {
-        $detected = $this->detect();
+        $snapshot = $this->systemSnapshot(true);
+        $detected = $snapshot['installed'];
 
         if ($detected === []) {
             throw new \RuntimeException('No PHP-FPM runtimes were detected.');
@@ -102,6 +107,78 @@ class PhpVersionService
         }
 
         $this->audit($userId, 'php_versions_mark_manual', 'success', 'Marked installed PHP ' . $version . ' packages as manually installed.', $ipAddress);
+    }
+
+    public function install(string $version, int $userId, string $ipAddress): void
+    {
+        if (preg_match('/^\d+\.\d+$/', $version) !== 1) {
+            throw new \InvalidArgumentException('Invalid PHP version.');
+        }
+
+        if (!$this->isAvailable($version, true)) {
+            throw new \InvalidArgumentException('PHP version is not available from the configured APT repositories.');
+        }
+
+        if ($this->env === 'local') {
+            $this->audit($userId, 'php_versions_install', 'success', 'Local mode skipped PHP ' . $version . ' install.', $ipAddress);
+            return;
+        }
+
+        $result = $this->commands->run('php-fpm-install', ['version' => $version]);
+
+        if ($result['exit_code'] !== 0) {
+            throw new \RuntimeException($result['output']);
+        }
+
+        $this->refresh($userId, $ipAddress);
+        $this->audit($userId, 'php_versions_install', 'success', 'Installed PHP ' . $version . ' runtime. ' . $result['output'], $ipAddress);
+    }
+
+    public function uninstall(string $version, int $userId, string $ipAddress): void
+    {
+        if (preg_match('/^\d+\.\d+$/', $version) !== 1) {
+            throw new \InvalidArgumentException('Invalid PHP version.');
+        }
+
+        $overview = $this->overview();
+        $target = null;
+
+        foreach ($overview['installed'] as $row) {
+            if ((string) $row['version'] === $version) {
+                $target = $row;
+                break;
+            }
+        }
+
+        if (!$target) {
+            throw new \InvalidArgumentException('PHP version is not installed: ' . $version);
+        }
+
+        if ((int) ($target['site_count'] ?? 0) > 0) {
+            throw new \InvalidArgumentException('Cannot uninstall PHP ' . $version . ' because active sites are pinned to it.');
+        }
+
+        if ((int) ($target['is_default'] ?? 0) === 1) {
+            throw new \InvalidArgumentException('Cannot uninstall PHP ' . $version . ' because it is the default PHP version.');
+        }
+
+        if ((int) ($target['is_panel_runtime'] ?? 0) === 1) {
+            throw new \InvalidArgumentException('Cannot uninstall PHP ' . $version . ' because it is used by the panel.');
+        }
+
+        if ($this->env === 'local') {
+            $this->audit($userId, 'php_versions_uninstall', 'success', 'Local mode skipped PHP ' . $version . ' uninstall.', $ipAddress);
+            return;
+        }
+
+        $result = $this->commands->run('php-fpm-uninstall', ['version' => $version]);
+
+        if ($result['exit_code'] !== 0) {
+            throw new \RuntimeException($result['output']);
+        }
+
+        $this->refresh($userId, $ipAddress);
+        $this->audit($userId, 'php_versions_uninstall', 'success', 'Uninstalled PHP ' . $version . ' runtime. ' . $result['output'], $ipAddress);
     }
 
     public function setDefault(string $version, int $userId, string $ipAddress): void
@@ -156,18 +233,13 @@ class PhpVersionService
         return array_values(array_filter($decoded, fn ($row): bool => is_array($row) && isset($row['version'], $row['fpm_socket'])));
     }
 
-    private function currentInstalled(): array
+    private function currentInstalled(array $snapshot): array
     {
         if ($this->env === 'local') {
             return $this->all();
         }
 
-        try {
-            $detected = $this->detect();
-        } catch (\Throwable) {
-            return $this->all();
-        }
-
+        $detected = $snapshot['installed'];
         if ($detected === []) {
             return $this->all();
         }
@@ -189,18 +261,95 @@ class PhpVersionService
         return $detected;
     }
 
-    private function available(): array
+    private function systemSnapshot(bool $force = false): array
     {
         if ($this->env === 'local') {
             return [
-                [
-                    'version' => '8.4',
-                    'package' => 'php8.4-fpm',
-                    'candidate' => 'local',
+                'installed' => $this->all(),
+                'available' => [
+                    [
+                        'version' => '8.4',
+                        'package' => 'php8.4-fpm',
+                        'candidate' => 'local',
+                    ],
                 ],
             ];
         }
 
+        if (!$force) {
+            $cached = $this->cachedSystemSnapshot();
+
+            if ($cached !== null) {
+                return $cached;
+            }
+        }
+
+        try {
+            $snapshot = [
+                'installed' => $this->detect(),
+                'available' => $this->availableLive(),
+            ];
+            $this->cacheSystemSnapshot($snapshot);
+            return $snapshot;
+        } catch (\Throwable) {
+            $cached = $this->cachedSystemSnapshot(false);
+
+            if ($cached !== null) {
+                return $cached;
+            }
+
+            return [
+                'installed' => $this->all(),
+                'available' => [],
+            ];
+        }
+    }
+
+    private function cachedSystemSnapshot(bool $requireFresh = true): ?array
+    {
+        $raw = $this->settings->get(self::CACHE_KEY);
+
+        if (!$raw) {
+            return null;
+        }
+
+        $decoded = json_decode($raw, true);
+
+        if (!is_array($decoded) || !isset($decoded['checked_at'], $decoded['installed'], $decoded['available'])) {
+            return null;
+        }
+
+        if (!is_array($decoded['installed']) || !is_array($decoded['available'])) {
+            return null;
+        }
+
+        $checkedAt = strtotime((string) $decoded['checked_at']);
+
+        if ($checkedAt === false) {
+            return null;
+        }
+
+        if ($requireFresh && $checkedAt < time() - self::CACHE_TTL_SECONDS) {
+            return null;
+        }
+
+        return [
+            'installed' => $decoded['installed'],
+            'available' => $decoded['available'],
+        ];
+    }
+
+    private function cacheSystemSnapshot(array $snapshot): void
+    {
+        $this->settings->set(self::CACHE_KEY, json_encode([
+            'checked_at' => date('Y-m-d H:i:s'),
+            'installed' => $snapshot['installed'] ?? [],
+            'available' => $snapshot['available'] ?? [],
+        ], JSON_UNESCAPED_SLASHES));
+    }
+
+    private function availableLive(): array
+    {
         $result = $this->commands->run('php-fpm-available');
 
         if ($result['exit_code'] !== 0) {
@@ -214,6 +363,43 @@ class PhpVersionService
         }
 
         return array_values(array_filter($decoded, fn ($row): bool => is_array($row) && isset($row['version'], $row['package'])));
+    }
+
+    private function availableWithInstallState(array $installed, array $available): array
+    {
+        $installedByVersion = [];
+
+        foreach ($installed as $row) {
+            $installedByVersion[(string) $row['version']] = $row;
+        }
+
+        foreach ($available as &$row) {
+            $version = (string) $row['version'];
+            $installedRow = $installedByVersion[$version] ?? null;
+            $row['installed'] = $installedRow !== null ? 1 : 0;
+            $row['site_count'] = (int) ($installedRow['site_count'] ?? 0);
+            $row['is_default'] = (int) ($installedRow['is_default'] ?? 0);
+            $row['is_panel_runtime'] = (int) ($installedRow['is_panel_runtime'] ?? 0);
+            $row['can_uninstall'] = $row['installed'] === 1
+                && $row['site_count'] === 0
+                && $row['is_default'] === 0
+                && $row['is_panel_runtime'] === 0;
+        }
+
+        unset($row);
+
+        return $available;
+    }
+
+    private function isAvailable(string $version, bool $forceRefresh = false): bool
+    {
+        foreach ($this->systemSnapshot($forceRefresh)['available'] as $row) {
+            if ((string) $row['version'] === $version) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function siteCountsByVersion(): array

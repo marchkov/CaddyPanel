@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [[ "${1:-}" == "version" ]]; then
+    VERSION="${2:-}"
+else
+    VERSION="${1:-}"
+fi
+
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    echo "Usage: php-fpm-install <major.minor>" >&2
+    exit 2
+fi
+
+if ! command -v apt-get >/dev/null 2>&1; then
+    echo "apt-get is not available." >&2
+    exit 2
+fi
+
+packages=(
+    "php${VERSION}-fpm"
+    "php${VERSION}-cli"
+    "php${VERSION}-common"
+    "php${VERSION}-sqlite3"
+    "php${VERSION}-mysql"
+    "php${VERSION}-mbstring"
+    "php${VERSION}-xml"
+    "php${VERSION}-curl"
+    "php${VERSION}-zip"
+    "php${VERSION}-gd"
+    "php${VERSION}-intl"
+)
+
+apt-get install -y "${packages[@]}"
+apt-mark manual "${packages[@]}" >/dev/null
+
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl enable --now "php${VERSION}-fpm" >/dev/null 2>&1 || true
+fi
+
+echo "Installed PHP ${VERSION} FPM runtime."
